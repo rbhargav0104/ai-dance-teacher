@@ -13,9 +13,15 @@ Sessions run at ~01:43 and ~13:43 IST daily.
 | Nov 29 | Finish **Outcome 5**; **Outcome 6** normalization, mirroring, bounded DTW, invariance tests |
 | Nov 30 | **Outcome 7** versioned scoring, confidence/coverage rules, golden-fixture relationship tests |
 | Dec 1 | **Outcome 8** timestamp feedback + overlay + replay; **Outcome 9** report, weakest-section loop, dashboard |
-| Dec 2 | **Outcome 10** Supabase auth/RLS/Postgres/private storage, durable worker, rate limits, observability |
-| Dec 3 | **Outcome 11** deployment configs (Docker, Railway, Vercel) + `deployment/RUNBOOK.md` |
-| Dec 4 | Final acceptance test (section 34), desktop/mobile visual QA, docs, handover |
+| Dec 2 | **Outcome 10** Postgres + durable worker (`FOR UPDATE SKIP LOCKED`), private storage adapter, multi-user isolation, rate limits, observability. Supabase adapters written and tested against local Postgres/S3-compatible storage (MinIO) in CI. |
+| Dec 3 | **Outcome 11 (adapted)** one-click owner testing: `.devcontainer/` for GitHub Codespaces + `docker compose up`; GitHub Actions CI running unit, API, golden-fixture and Playwright E2E tests (fake-webcam from fixtures). Vercel/Railway/Supabase configs + `deployment/RUNBOOK.md` prepared but not deployed. |
+| Dec 4 | Final acceptance test (section 34) run in CI and in a Codespaces-equivalent container, desktop/mobile visual QA, docs, handover |
+
+## Owner constraint (2026-11-24)
+The owner will only test. No owner-supplied videos, accounts or credentials.
+- Assets: sourced by sessions per `docs/SOURCING.md`.
+- "Stable deployed URL" in the spec is replaced by a one-click GitHub Codespaces environment (owner already has GitHub)
+  plus green CI. A public Vercel/Railway URL needs accounts the owner hasn't set up; keep those configs ready so it's a 10-minute step later.
 
 If behind schedule: keep the order. Correctness, tests and honest-state rules come before visual expansion.
 Never skip an exit gate; record any slip in PROJECT_STATUS.md.

@@ -10,6 +10,8 @@ Each session starts fresh: this repo is the only memory between runs.
 - `DECISIONS.md` — material decisions (append, never rewrite history).
 - `docs/RUN_LOG.md` — one entry per session.
 
+- `docs/SOURCING.md` — where the pose model, reference videos and attempt fixtures come from. **The owner supplies nothing and only tests.** Never block on the owner for assets or accounts; find a way, and only escalate something that is truly impossible.
+
 ## Start of every session
 1. Read PROJECT_STATUS.md, the latest docs/RUN_LOG.md entries, and `git log --oneline -20`.
 2. Re-run the previous outcome's exit-gate checks before building further.
@@ -19,7 +21,7 @@ Each session starts fresh: this repo is the only memory between runs.
 - No fake AI: no random, hard-coded or invented scores, poses or feedback. Synthetic landmark sequences are for pure-math unit tests only.
 - Unavailable inference → explicit LIMITED state, never a simulated result.
 - Never commit secrets, real credentials, or `.env` files. Only `.env.example`.
-- Never commit large binaries except owner-supplied fixtures under `fixtures/` (keep provenance in `fixtures/fixture_manifest.json`).
+- Never commit large binaries except trimmed, licensed fixture videos under `fixtures/` (≤720p, ≤30 s each; provenance in `fixtures/fixture_manifest.json`). The pose model is downloaded, never committed.
 - Keep the app runnable at every push. Run tests before committing; record exact commands + results in the run log.
 - Report progress by outcomes and exit gates, never percentages.
 

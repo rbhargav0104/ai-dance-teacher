@@ -25,8 +25,9 @@ States: planned → implemented → tested → deployed.
 _None yet._
 
 ## Owner action needed
-- **Fixture videos** (needed by ~Nov 26 for real pose checks, required by Nov 30 for scoring calibration):
-  - `fixtures/references/`: 1–3 short (15–30 s) single-dancer, full-body clips you own or have a license for.
-  - `fixtures/attempts/`: your own attempts at those dances — ideally one good, one slightly late, one wrong arm, one partly out of frame.
-  - Note the source/license of each clip in `fixtures/fixture_manifest.json` (or tell Claude and it will write it).
-- **Deployment accounts** (by ~Dec 2): a Supabase project, and Vercel + Railway accounts linked to this GitHub repo. Exact steps will be in `deployment/RUNBOOK.md`.
+_None. The owner only tests. Sessions source every asset themselves (see `docs/SOURCING.md`)._
+Only add an item here if it is truly impossible without the owner, and say why.
+
+## Owner testing path (target)
+- **GitHub Codespaces:** repo page → Code → Codespaces → Create. The devcontainer installs everything, downloads the model, seeds the demo, and starts the app on a forwarded HTTPS URL (webcam works).
+- **Local alternative:** `docker compose up`, then open http://localhost:3000.
