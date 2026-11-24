@@ -57,7 +57,7 @@ _None. The owner only tests. Sessions source every asset themselves (see `docs/S
 ## How Bhargav can test right now
 
 Not much to click yet — this is the foundation. If you want to look:
-1. Open the repo's **Actions** tab: the latest **CI** run should be green (backend, frontend, smoke).
+1. Open the repo's **Actions** tab: the latest **CI** run is green (backend, frontend, smoke) — verified for d4c1597.
 2. Optional, on any machine with Node 20+ and [uv](https://docs.astral.sh/uv/): `scripts/setup.sh && scripts/dev.sh`,
    then open http://localhost:3000 (landing) and http://localhost:3000/studio (system check, status pill says LIMITED).
 

@@ -25,7 +25,7 @@ Commands and results:
 - `uv run python -m app.pose.verify` → `{"ok": true, "mediapipe": "1.2.3", "poses_on_blank_frame": 0}`.
 - `cd frontend && npm test` → 12 passed; `npm run lint`, `npm run typecheck`, `npm run build` → clean.
 - Fresh clone → `scripts/setup.sh` → `scripts/dev.sh` → `scripts/smoke.sh` → SMOKE OK. Playwright desktop/mobile screenshots checked; OFFLINE verified by stopping the API.
-- CI run 1: backend job failed — `libEGL.so.1` missing on the runner for MediaPipe. Fixed by installing `libegl1 libgles2 libgl1`; result of run 2 recorded below.
+- CI run 1: backend job failed — `libEGL.so.1` missing on the runner for MediaPipe. Fixed by installing `libegl1 libgles2 libgl1`; CI run 2 (d4c1597) → **green** (backend, frontend, smoke).
 
 Next (Nov 25, Outcome 1): streaming upload `POST /api/projects` with idempotency key, FFprobe validation, private source
 storage, job record, no-residue rejection tests for every invalid-media case, project list/delete, upload UI with
