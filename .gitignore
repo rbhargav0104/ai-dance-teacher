@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Runtime data (SQLite DB, private objects, temp files) — never committed
+/data/
+/backend/data/
+
+# Pose model is downloaded by scripts/download_model.sh, never committed
+/models/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Node / misc
+node_modules/
+.DS_Store
+*.log

@@ -1,0 +1,69 @@
+@import "tailwindcss";
+@import "@fontsource-variable/unbounded";
+
+/* Dark private studio + electric-lime movement signals (spec section 7). */
+@theme {
+  --color-studio: #10120f;
+  --color-raised: #1a1d17;
+  --color-raised-2: #22261e;
+  --color-line: #33382e;
+  --color-lime: #c1f86a;
+  --color-track: #9bea35;
+  --color-ink: #f1f4eb;
+  --color-muted: #a2aa98;
+  --color-amber: #f5b84b;
+  --color-danger: #ff7a66;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: "Unbounded Variable", var(--font-geist-sans), sans-serif;
+
+  --animate-drift: drift 9s ease-in-out infinite;
+  --animate-pulse-dot: pulse-dot 2.4s ease-in-out infinite;
+
+  @keyframes drift {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+    50% { transform: translate3d(0, -10px, 0) rotate(-1.5deg); }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.82); }
+  }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-studio);
+  color: var(--color-ink);
+}
+
+body {
+  background:
+    radial-gradient(60rem 40rem at 85% -10%, rgb(193 248 106 / 0.08), transparent 60%),
+    radial-gradient(40rem 30rem at -10% 110%, rgb(155 234 53 / 0.05), transparent 60%),
+    var(--color-studio);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--color-lime);
+  color: var(--color-studio);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-lime);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
