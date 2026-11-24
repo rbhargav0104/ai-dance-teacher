@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 
 BACKEND = Path(__file__).resolve().parent.parent
 
+pytest_plugins = ["tests.media_factory"]
+
 
 def _clear_caches() -> None:
     from app.config import get_settings

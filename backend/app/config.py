@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     max_projects_per_user: int = 20
     max_sessions_per_project: int = 50
     job_max_attempts: int = 3
+    ffprobe_timeout_seconds: float = 20.0
+    fixtures_dir: Path = REPO_ROOT / "fixtures"
     session_ttl_seconds: int = 60 * 60 * 24 * 7
 
     supabase_url: str = ""
@@ -74,7 +76,7 @@ class Settings(BaseSettings):
                 data[key] = [o.strip() for o in raw.split(",") if o.strip()]
         return data
 
-    @field_validator("data_dir", "model_path", mode="after")
+    @field_validator("data_dir", "model_path", "fixtures_dir", mode="after")
     @classmethod
     def _anchor_relative_paths(cls, value: Path) -> Path:
         # Relative paths in .env are relative to the repo root, whatever the cwd.

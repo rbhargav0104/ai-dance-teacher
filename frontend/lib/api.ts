@@ -1,4 +1,13 @@
-import type { ApiErrorBody, HealthResponse, MeResponse, SessionResponse } from "./types";
+import type {
+  ApiErrorBody,
+  HealthResponse,
+  MediaUrl,
+  MeResponse,
+  Project,
+  ProjectList,
+  Sample,
+  SessionResponse,
+} from "./types";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 const TOKEN_KEY = "adt.session.v1";
@@ -49,6 +58,7 @@ async function raw(path: string, init: RequestInit = {}): Promise<Response> {
 }
 
 async function parse<T>(res: Response): Promise<T> {
+  if (res.status === 204) return undefined as T;
   if (res.ok) return (await res.json()) as T;
   let body: ApiErrorBody | null = null;
   try {
@@ -98,6 +108,118 @@ export async function authed<T>(path: string, init: RequestInit = {}): Promise<T
 
 export function getMe(): Promise<MeResponse> {
   return authed<MeResponse>("/api/me");
+}
+
+export const listProjects = () => authed<ProjectList>("/api/projects");
+export const getProject = (id: string) =>
+  authed<Project>(`/api/projects/${encodeURIComponent(id)}`);
+export const deleteProject = (id: string) =>
+  authed<void>(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const getSourceMedia = (id: string) =>
+  authed<MediaUrl>(`/api/projects/${encodeURIComponent(id)}/media/source`);
+export const startAnalysis = (id: string) =>
+  authed<unknown>(`/api/projects/${encodeURIComponent(id)}/analysis`, { method: "POST" });
+export const listSamples = async () => parse<Sample[]>(await raw("/api/samples"));
+export const addSample = (sampleId: string) =>
+  authed<Project>("/api/projects/sample", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sample_id: sampleId }),
+  });
+
+/** Resolve a server-relative media URL against the API base (same-origin by default). */
+export const mediaHref = (url: string) => `${API_BASE}${url}`;
+
+export interface UploadHandle {
+  promise: Promise<Project>;
+  abort: () => void;
+}
+
+export interface UploadOptions {
+  file: File;
+  title?: string;
+  /** Stable per selected file: a manual retry after a network error can never duplicate it. */
+  idempotencyKey: string;
+  onProgress?: (fraction: number) => void;
+}
+
+export class UploadAborted extends Error {
+  constructor() {
+    super("Upload cancelled.");
+    this.name = "UploadAborted";
+  }
+}
+
+function xhrUpload(token: string, opts: UploadOptions, setXhr: (x: XMLHttpRequest) => void) {
+  return new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    setXhr(xhr);
+    xhr.open("POST", `${API_BASE}/api/projects`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("Idempotency-Key", opts.idempotencyKey);
+    xhr.responseType = "text";
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0) opts.onProgress?.(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      let body: unknown = null;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        /* non-JSON (proxy error page) */
+      }
+      resolve({ status: xhr.status, body });
+    };
+    xhr.onerror = () => reject(new NetworkError());
+    xhr.onabort = () => reject(new UploadAborted());
+    const form = new FormData();
+    if (opts.title) form.append("title", opts.title);
+    form.append("file", opts.file, opts.file.name);
+    xhr.send(form);
+  });
+}
+
+function toProjectOrThrow(res: { status: number; body: unknown }): Project {
+  if (res.status >= 200 && res.status < 300) return res.body as Project;
+  const err = (res.body as ApiErrorBody | null)?.error;
+  if (res.status === 413 && !err) {
+    throw new ApiError(413, "file_too_large", "This video is larger than the server accepts.");
+  }
+  throw new ApiError(
+    res.status,
+    err?.code ?? "http_error",
+    err?.message ?? `Upload failed (${res.status}).`,
+  );
+}
+
+/**
+ * Upload a reference video with real byte progress. A 401 is always raised before anything is
+ * persisted, so it is safe to refresh the local session and retry exactly once (spec 25).
+ * Network failures are surfaced, never auto-retried; a manual retry reuses the idempotency key.
+ */
+export function uploadReference(opts: UploadOptions): UploadHandle {
+  let current: XMLHttpRequest | null = null;
+  let aborted = false;
+  const setXhr = (x: XMLHttpRequest) => {
+    current = x;
+  };
+  const promise = (async () => {
+    let res = await xhrUpload(await ensureToken(), opts, setXhr);
+    if (res.status === 401 && !aborted) {
+      memoryToken = null;
+      writeToken(null);
+      opts.onProgress?.(0);
+      res = await xhrUpload(await createSession(), opts, setXhr);
+    }
+    return toProjectOrThrow(res);
+  })();
+  return {
+    promise,
+    abort: () => {
+      aborted = true;
+      current?.abort();
+    },
+  };
 }
 
 /** Test hook. */

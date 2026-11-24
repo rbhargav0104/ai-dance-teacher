@@ -30,3 +30,27 @@ Commands and results:
 Next (Nov 25, Outcome 1): streaming upload `POST /api/projects` with idempotency key, FFprobe validation, private source
 storage, job record, no-residue rejection tests for every invalid-media case, project list/delete, upload UI with
 drag-drop/preview, finish fixture sourcing (find a full-body clip) and commit trimmed fixtures + manifest + LICENSES.md.
+
+## 2026-11-25 01:43–02:35 IST — build session 2 (Outcome 1)
+Start: Outcome 0 gate re-checked — fresh `scripts/setup.sh`, `uv run pytest` 35 passed, `scripts/smoke.sh` SMOKE OK.
+
+Delivered:
+- Backend: `app/media/probe.py` (FFprobe argv + timeout, pure `validate_probe` rules), `app/media/upload.py` (streaming
+  multipart, limit enforced mid-stream), `app/services/intake.py` (atomic persist + cleanup, idempotency, quota, samples),
+  `app/api/projects.py`, `app/api/media.py` (signed URLs, ranges), migration `0002` (source size/codec/container/audio/rotation),
+  health reports `media_inspection` + `uploads_available`.
+- Frontend: upload panel (drag-drop, preview, metadata, progress, retry, errors), library + delete, `/studio/projects/[id]`
+  dance page with private playback and disabled Analyze, `/studio?demo=1` sample picker.
+- Fixtures: two Mixkit clips trimmed/transcoded to 1280×720 H.264, no audio, with manifest + licences (sourced by a
+  sub-agent; ~20 min search for a full-body clip found none with a verifiable licence — details in docs/SOURCING.md).
+- Next proxy body limit raised (default 10 MB truncated uploads → found by a manual 85 MB upload test).
+- smoke.sh now covers sample intake, ranged media and delete; CI smoke job installs ffmpeg.
+
+Commands and results:
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 111 passed.
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 24 passed.
+- `scripts/smoke.sh` (built web + API) → SMOKE OK. Playwright desktop + iPhone 13 screenshots reviewed.
+
+Next (Nov 26, Outcome 2): canonical transcode job (24 fps H.264, ≤1280 px), real MediaPipe extraction on the fixture clips,
+quality gates (coverage, multi-person, cropped body — both samples should warn), stored frames, skeleton viewer/debugger,
+demo project produced by the real pipeline, cached runtime self-test in /api/health, flip LIMITED → READY only when it all works.

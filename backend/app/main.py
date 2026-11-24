@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import health, session
+from app.api import health, media, projects, session
 from app.config import get_settings
 from app.errors import install_error_handlers
 from app.logging_setup import configure_logging, install_request_logging
@@ -30,13 +30,15 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
-        allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
-        expose_headers=["X-Request-ID"],
+        allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID", "Range"],
+        expose_headers=["X-Request-ID", "Content-Range", "Accept-Ranges"],
     )
     install_request_logging(app)
     install_error_handlers(app)
     app.include_router(health.router)
     app.include_router(session.router)
+    app.include_router(projects.router)
+    app.include_router(media.router)
     return app
 
 

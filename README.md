@@ -20,13 +20,16 @@ scripts/dev.sh       # API on :8000, web on :3000
 Then open:
 
 - http://localhost:3000 — landing page; the status pill (top right) shows **STUDIO READY / LIMITED / OFFLINE**
-- http://localhost:3000/studio — private studio shell + live system check
+- http://localhost:3000/studio — upload a reference dance (drag-drop), see your library, open/play/delete a dance
+- http://localhost:3000/studio?demo=1 — add a licensed sample clip (Mixkit) through the same private intake
 - http://localhost:8000/api/health — capability JSON
 - http://localhost:8000/api/docs — OpenAPI docs
 
 Check a running stack: `scripts/smoke.sh`.
 
-The browser calls the API **same-origin** (`/api/*`), and Next.js proxies to `API_INTERNAL_URL` — so only port 3000 needs to be exposed.
+The browser calls the API **same-origin** (`/api/*`), and Next.js proxies to `API_INTERNAL_URL` — so only port 3000 needs to be exposed. Uploads go through that proxy too; `next.config.ts` raises Next's proxied-body limit to `MAX_UPLOAD_MB + 1` MB (the API enforces the real limit while streaming).
+
+Video inspection needs `ffprobe` (`apt install ffmpeg` / `brew install ffmpeg`). Reference uploads are validated with FFprobe, stored privately under `data/objects/`, and served only through short-lived signed URLs.
 
 ### Running pieces by hand
 

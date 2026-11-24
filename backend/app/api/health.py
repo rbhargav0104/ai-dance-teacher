@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from app import __version__
 from app.config import Settings, get_settings
 from app.db.session import database_ok, schema_revision
+from app.media.probe import ACCEPTED_EXTENSIONS, ffprobe_available
 from app.pose.runtime import probe
 from app.storage import get_storage
 
@@ -17,7 +18,6 @@ router = APIRouter(tags=["health"])
 
 # Flipped to True only when the real reference pipeline (Outcome 2) is wired end to end.
 ANALYSIS_PIPELINE_IMPLEMENTED = False
-ACCEPTED_EXTENSIONS = [".mp4", ".mov", ".webm"]
 
 
 class ComponentState(BaseModel):
@@ -51,6 +51,8 @@ class HealthResponse(BaseModel):
     storage_provider: str
     database: ComponentState
     storage: ComponentState
+    media_inspection: ComponentState
+    uploads_available: bool
     analysis: AnalysisState
     limits: Limits
 
@@ -71,6 +73,7 @@ def health(
     revision = schema_revision() if db_ok else None
     storage_ok = _storage_ok()
     pose = probe(settings.model_path, settings.model_sha256)
+    inspect_ok = ffprobe_available()
 
     reason = pose.problem
     if reason is None and not ANALYSIS_PIPELINE_IMPLEMENTED:
@@ -101,6 +104,10 @@ def health(
         storage_provider=settings.storage_provider.value,
         database=ComponentState(ok=db_ok and revision is not None, detail=revision),
         storage=ComponentState(ok=storage_ok),
+        media_inspection=ComponentState(
+            ok=inspect_ok, detail=None if inspect_ok else "FFprobe is not installed."
+        ),
+        uploads_available=persistence_ok and inspect_ok,
         analysis=AnalysisState(
             available=analysis_available,
             pipeline_implemented=ANALYSIS_PIPELINE_IMPLEMENTED,
@@ -114,7 +121,7 @@ def health(
         limits=Limits(
             max_upload_mb=settings.max_upload_mb,
             max_duration_seconds=settings.max_duration_seconds,
-            accepted_extensions=ACCEPTED_EXTENSIONS,
+            accepted_extensions=list(ACCEPTED_EXTENSIONS),
         ),
     )
 

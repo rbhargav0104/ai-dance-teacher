@@ -8,8 +8,10 @@ export function health(overrides: Partial<HealthResponse> = {}): HealthResponse 
     app_env: "test",
     auth_mode: "local",
     storage_provider: "local",
-    database: { ok: true, detail: "0001" },
+    database: { ok: true, detail: "0002" },
     storage: { ok: true, detail: null },
+    media_inspection: { ok: true, detail: null },
+    uploads_available: true,
     analysis: {
       available: false,
       pipeline_implemented: false,

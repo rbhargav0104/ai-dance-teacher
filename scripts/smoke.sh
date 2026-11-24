@@ -16,4 +16,19 @@ code="$(curl -s -o /dev/null -w '%{http_code}' "$API/api/me")"
 echo "-- web + proxy"
 curl -fsS "$WEB/" | grep -q "Frame by frame" && echo "landing ok"
 curl -fsS "$WEB/api/health" | py 'print("proxied health:", d["status"])'
+echo "-- reference intake through the proxy (sample + delete)"
+WTOKEN="$(curl -fsS -X POST "$WEB/api/session" | py 'print(d["token"])')"
+SAMPLE="$(curl -fsS "$WEB/api/samples" | py 'print(d[0]["id"])')"
+PID="$(curl -fsS -X POST "$WEB/api/projects/sample" -H "Authorization: Bearer $WTOKEN" \
+  -H "Content-Type: application/json" -d "{\"sample_id\": \"$SAMPLE\"}" | py 'print(d["id"])')"
+curl -fsS "$WEB/api/projects/$PID" -H "Authorization: Bearer $WTOKEN" \
+  | py 'r=d["reference"]; print("sample stored:", r["width"], "x", r["height"], r["duration"], "s"); assert d["latest_job"]["status"]=="succeeded"'
+URL="$(curl -fsS "$WEB/api/projects/$PID/media/source" -H "Authorization: Bearer $WTOKEN" | py 'print(d["url"])')"
+code="$(curl -s -o /dev/null -w '%{http_code}' -H 'Range: bytes=0-99' "$WEB$URL")"
+[[ "$code" == "206" ]] || { echo "expected 206 for ranged media, got $code"; exit 1; }
+code="$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$WEB/api/projects/$PID" -H "Authorization: Bearer $WTOKEN")"
+[[ "$code" == "204" ]] || { echo "delete failed: $code"; exit 1; }
+code="$(curl -s -o /dev/null -w '%{http_code}' "$WEB$URL")"
+[[ "$code" == "404" ]] || { echo "media should be gone after delete, got $code"; exit 1; }
+echo "intake ok"
 echo "SMOKE OK"

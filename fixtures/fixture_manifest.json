@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "references": [
+    {
+      "id": "mixkit_girl_earphones_28306",
+      "file": "references/mixkit_girl_earphones_28306.mp4",
+      "sha256": "23cb9b0bed53c1195f3a9ba81b3a7bfab337939a63e7a680aa830e0186a07525",
+      "bytes": 1300654,
+      "width": 1280,
+      "height": 720,
+      "fps": 24,
+      "duration": 14.0,
+      "source": {
+        "repo": "alexandremendoncaalvaro/CorridorKey-Runtime",
+        "path": "assets/video_samples/mixkit-girl-dancing-with-her-earphones-on-a-green-background-28306-4k.mp4",
+        "ref": "HEAD",
+        "download_url": "https://media.githubusercontent.com/media/alexandremendoncaalvaro/CorridorKey-Runtime/HEAD/assets/video_samples/mixkit-girl-dancing-with-her-earphones-on-a-green-background-28306-4k.mp4",
+        "downloaded": "2026-11-25",
+        "original_sha256": "80e0bf3d84faf6e2b0efabfc9001aeadde09e1ce56d0530360ceff5b9be596a5"
+      },
+      "original_source": "Mixkit (mixkit.co) clip 28306, 'Girl dancing with her earphones on a green background' (3840x2160, 24 fps, 14.0 s, no audio)",
+      "license": "Mixkit Free License",
+      "license_url": "https://mixkit.co/license/",
+      "transform": "ffmpeg -i mixkit-girl-dancing-with-her-earphones-on-a-green-background-28306-4k.mp4 -an -vf \"scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2\" -c:v libx264 -preset slow -crf 26 -pix_fmt yuv420p -movflags +faststart -map_metadata -1 mixkit_girl_earphones_28306.mp4",
+      "framing": "Single dancer, fixed camera, flat green-screen background. Visible: head, shoulders, both arms and hands, torso, hips; frame cuts at the upper thighs, so knees, ankles and feet are never visible. She holds a phone in one hand with a wired earphone cable. She drifts horizontally across the frame (left, centre, right in sampled frames at ~0.5 s, 7 s, 13.5 s).",
+      "notes": "Motion: arm/torso-heavy, gentle sway and hip movement, hand to ear, horizontal drift; no visible footwork. Use as the cropped-body (thighs-up) reference; lower-body landmarks must be reported as not visible, not guessed. Full clip kept (14.0 s, under the 20 s cap).",
+      "title": "Earphones groove (sample)"
+    },
+    {
+      "id": "mixkit_boy_funny_28289",
+      "file": "references/mixkit_boy_funny_28289.mp4",
+      "sha256": "5ac1941dd57cf4467d638c74956936e423997a3a6d8147aab1c072dc3326a35c",
+      "bytes": 1885308,
+      "width": 1280,
+      "height": 720,
+      "fps": 30,
+      "duration": 15.967,
+      "source": {
+        "repo": "hasanosman2020/20JSProjects_02Mastery",
+        "path": "video_player/videoclips/mixkit-boy-dancing-funnily-on-a-green-chroma-background-28289-medium.mp4",
+        "ref": "HEAD",
+        "download_url": "https://media.githubusercontent.com/media/hasanosman2020/20JSProjects_02Mastery/HEAD/video_player/videoclips/mixkit-boy-dancing-funnily-on-a-green-chroma-background-28289-medium.mp4",
+        "downloaded": "2026-11-25",
+        "original_sha256": "04d1ad1735db6c8024afd7aae5cc95d29649c67c1f2310c7a48cd404ee99339c"
+      },
+      "original_source": "Mixkit (mixkit.co) clip 28289, 'Boy dancing funnily on a green chroma background' (1280x720, 59.94 fps, 15.97 s)",
+      "license": "Mixkit Free License",
+      "license_url": "https://mixkit.co/license/",
+      "transform": "ffmpeg -i mixkit-boy-dancing-funnily-on-a-green-chroma-background-28289-medium.mp4 -an -vf \"scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,fps=30\" -c:v libx264 -preset slow -crf 26 -pix_fmt yuv420p -movflags +faststart -map_metadata -1 mixkit_boy_funny_28289.mp4",
+      "framing": "Single dancer, fixed camera, flat green-screen background. Visible: head, shoulders, both arms and hands, torso, hips, upper thighs (jeans); in sampled frames (~0.5 s, 8 s, 15.5 s) the frame cuts around mid-thigh, so knees, ankles and feet are not visible. He shifts left/centre/right across the frame.",
+      "notes": "Motion: playful arm swings and hip grooves with side-to-side stepping (steps inferred from body travel; feet out of frame), bent-knee bouncing posture. Source 59.94 fps reduced to 30 fps. Use as a second cropped-body reference with more lateral travel than 28306. Full clip kept (15.97 s).",
+      "title": "Green-screen bounce (sample)"
+    }
+  ],
+  "attempts": []
+}

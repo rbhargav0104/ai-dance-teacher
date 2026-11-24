@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Float,
     ForeignKey,
@@ -80,6 +81,11 @@ class ReferenceVideo(Base):
     canonical_object_key: Mapped[str | None] = mapped_column(String(512))
     thumbnail_key: Mapped[str | None] = mapped_column(String(512))
     original_filename: Mapped[str | None] = mapped_column(String(255))
+    source_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    source_codec: Mapped[str | None] = mapped_column(String(32))
+    source_container: Mapped[str | None] = mapped_column(String(64))
+    has_audio: Mapped[bool | None] = mapped_column(Boolean)
+    rotation: Mapped[int | None] = mapped_column(Integer)
     duration: Mapped[float] = mapped_column(Float)
     source_fps: Mapped[float] = mapped_column(Float)
     analysis_fps: Mapped[float | None] = mapped_column(Float)
