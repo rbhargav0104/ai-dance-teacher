@@ -70,7 +70,7 @@ See `ARCHITECTURE.md` for how the pieces fit, and `DECISIONS.md` for why.
 ## Troubleshooting
 
 - **`scripts/download_model.sh` fails** — the app still runs in LIMITED mode. The script tries the official URL, then GitHub mirrors, and only accepts the pinned SHA-256.
-- **OpenCV/MediaPipe import errors on Linux** — install `libgl1 libglib2.0-0` (Debian/Ubuntu).
+- **MediaPipe `libEGL.so.1` / OpenCV import errors on Linux** — install `libegl1 libgles2 libgl1 libglib2.0-0` (Debian/Ubuntu). MediaPipe 1.2.x loads EGL even for CPU inference.
 - **Status pill says OFFLINE** — the API isn't running on `API_INTERNAL_URL` (default `http://127.0.0.1:8000`), or migrations haven't run (`cd backend && uv run alembic upgrade head`).
 
 ## Privacy

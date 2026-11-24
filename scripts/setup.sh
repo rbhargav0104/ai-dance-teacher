@@ -8,6 +8,10 @@ command -v uv >/dev/null || { echo "Install uv first: https://docs.astral.sh/uv/
 command -v node >/dev/null || { echo "Install Node.js >= 20.9"; exit 1; }
 command -v ffprobe >/dev/null || echo "warning: ffmpeg/ffprobe not found — needed from Outcome 1 (apt install ffmpeg / brew install ffmpeg)"
 
+if [[ "$(uname)" == "Linux" ]] && command -v ldconfig >/dev/null && ! ldconfig -p | grep -q "libEGL.so.1"; then
+  echo "warning: libEGL missing — MediaPipe needs it: sudo apt-get install -y libegl1 libgles2 libgl1"
+fi
+
 [[ -f .env ]] || cp .env.example .env
 
 echo "== backend dependencies"

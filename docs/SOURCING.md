@@ -21,6 +21,25 @@ Find real, openly licensed clips of one full-body dancer on a fixed camera, comm
 Search with `gh api "search/code?q=..."` (e.g. `filename:dance extension:mp4`, `mixkit dance`, `pexels dance`).
 Acceptable licenses: Mixkit Free License, Pexels License, Pixabay Content License, CC0, CC-BY (with attribution).
 Lead found 2026-11-24: `alexandremendoncaalvaro/CorridorKey-Runtime` → `assets/video_samples/mixkit-girl-dancing-with-her-earphones-on-a-green-background-28306-4k.mp4` (Mixkit).
+
+### Findings 2026-11-24 (build session 1)
+- In scheduled runs `gh api repos/<other>/...` is **denied** (scope is this repo only), but `gh api search/code` works and
+  direct downloads from `https://media.githubusercontent.com/media/<owner>/<repo>/HEAD/<url-encoded path>` work (LFS),
+  falling back to `raw.githubusercontent.com`. Record HEAD as the ref and the download date; the blob commit SHA can't be
+  looked up via the API from here, so store the file's own SHA-256 in the manifest instead.
+- Verified downloadable Mixkit clips (Mixkit Free License, single dancer, green screen, fixed camera):
+  1. `alexandremendoncaalvaro/CorridorKey-Runtime` → `assets/video_samples/mixkit-girl-dancing-with-her-earphones-on-a-green-background-28306-4k.mp4`
+     — 3840×2160, 24 fps, 14.0 s, no audio, 66 MB. Framed **thighs-up** (feet not visible): arm/torso-heavy, gentle sway.
+  2. `hasanosman2020/20JSProjects_02Mastery` → `video_player/videoclips/mixkit-boy-dancing-funnily-on-a-green-chroma-background-28289-medium.mp4`
+     — 1280×720, 59.94 fps, 16.0 s. Framed **knees-up**: playful arm + hip grooves, steps side to side.
+  Neither shows feet, so both will carry a "cropped body" warning — honest, and useful as the cropped-body case.
+- Rejected: `reallyigor/easy_dwpose assets/dance.mp4` (2 s, licence unknown), `gatewai-dev/framefields-smoke assets/dancer.mp4`
+  (6 s, licence unknown), OpenNeuroDatasets Kinetics-derived clips (YouTube-sourced, not openly licensed).
+- Still needed: one **full-body** clip (feet visible). Next searches: `filename:mixkit` with `.webm`/`.mov`, Mixkit IDs near
+  28289–28306 (same green-screen shoot series, e.g. `mixkit-*-dancing-*-on-a-green-*`), `filename:full-body`, `filename:pexels-`
+  with numeric IDs + `dance` in repo README. If none is found by Outcome 2, use the two Mixkit clips plus a distinct
+  time-window of each as separate references, and document that limitation in PROJECT_STATUS.
+
 Aim for 3 references with different motion (e.g. arm-heavy, footwork/travel, pauses). Trim/transcode to 15–30 s, ≤720p, before committing to `fixtures/references/`.
 Record source repo, path, commit SHA, original source and license in `fixtures/fixture_manifest.json` and `fixtures/LICENSES.md`.
 Avoid clips with copyrighted music where possible; strip audio from fixtures if licensing is unclear.
