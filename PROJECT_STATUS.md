@@ -89,7 +89,7 @@ _None. The owner only tests. Sessions source every asset themselves (see `docs/S
 ## How Bhargav can test right now
 
 The one-click Codespaces path lands on Dec 3. Until then:
-1. Open the repo's **Actions** tab: the latest **CI** run should be green (backend, frontend, smoke).
+1. Open the repo's **Actions** tab: the latest **CI** run is green (backend, frontend, smoke) — verified for 30816b5.
 2. Optional, on a machine with Node 20+, [uv](https://docs.astral.sh/uv/) and ffmpeg: `scripts/setup.sh && scripts/dev.sh`, then
    - http://localhost:3000/studio?demo=1 → **Use this sample** → the dance page plays the clip privately;
    - http://localhost:3000/studio → drop any MP4/MOV/WebM → preview → **Upload to studio**; try a .txt or an audio file to see the rejections;

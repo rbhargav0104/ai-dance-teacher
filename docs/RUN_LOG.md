@@ -54,3 +54,4 @@ Commands and results:
 Next (Nov 26, Outcome 2): canonical transcode job (24 fps H.264, ≤1280 px), real MediaPipe extraction on the fixture clips,
 quality gates (coverage, multi-person, cropped body — both samples should warn), stored frames, skeleton viewer/debugger,
 demo project produced by the real pipeline, cached runtime self-test in /api/health, flip LIMITED → READY only when it all works.
+- CI run 4 (30816b5) → **green** (backend, frontend, smoke incl. intake via proxy).
