@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -58,6 +58,14 @@ class Settings(BaseSettings):
     max_sessions_per_project: int = 50
     job_max_attempts: int = 3
     ffprobe_timeout_seconds: float = 20.0
+    transcode_timeout_seconds: float = 300.0
+    analysis_timeout_seconds: float = 900.0
+    # thread: in-process background worker (development, one API process).
+    # manual: jobs run only when code calls Worker.run_once() (tests).
+    # off: no worker; analysis is reported unavailable (LIMITED).
+    worker_mode: Literal["thread", "manual", "off"] = "thread"
+    job_lease_seconds: float = 90.0
+    worker_poll_seconds: float = 1.0
     fixtures_dir: Path = REPO_ROOT / "fixtures"
     session_ttl_seconds: int = 60 * 60 * 24 * 7
 

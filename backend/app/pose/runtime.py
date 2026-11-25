@@ -69,3 +69,45 @@ def probe(model_path: Path, expected_sha256: str) -> PoseRuntimeStatus:
     elif not verified:
         problem = "The pose model file failed its integrity check."
     return PoseRuntimeStatus(present, verified, installed, version, model_version, problem)
+
+
+_selftest_cache: dict[str, tuple[bool, str | None]] = {}
+
+
+def selftest(model_path: Path, expected_sha256: str) -> tuple[bool, str | None]:
+    """Load the model and run one real VIDEO-mode inference (cached per model file).
+
+    Catches what `probe()` cannot: native libraries (libEGL/GLES) missing at load time.
+    """
+    status = probe(model_path, expected_sha256)
+    if not status.available:
+        return False, status.problem
+    st = model_path.stat()
+    key = f"{model_path}:{st.st_size}:{st.st_mtime_ns}"
+    with _lock:
+        if key in _selftest_cache:
+            return _selftest_cache[key]
+    try:
+        import mediapipe as mp
+        import numpy as np
+        from mediapipe.tasks.python import BaseOptions
+        from mediapipe.tasks.python.vision import (
+            PoseLandmarker,
+            PoseLandmarkerOptions,
+            RunningMode,
+        )
+
+        options = PoseLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=str(model_path)),
+            running_mode=RunningMode.VIDEO,
+            num_poses=1,
+        )
+        with PoseLandmarker.create_from_options(options) as landmarker:
+            frame = np.zeros((128, 128, 3), dtype=np.uint8)
+            landmarker.detect_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=frame), 0)
+        result: tuple[bool, str | None] = (True, None)
+    except Exception as exc:  # noqa: BLE001 - any load failure means LIMITED, reported honestly
+        result = (False, f"The movement-analysis runtime failed to load ({type(exc).__name__}).")
+    with _lock:
+        _selftest_cache[key] = result
+    return result

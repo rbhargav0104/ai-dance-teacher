@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Response
@@ -10,14 +11,16 @@ from pydantic import BaseModel
 from app import __version__
 from app.config import Settings, get_settings
 from app.db.session import database_ok, schema_revision
+from app.jobs.worker import worker_available
 from app.media.probe import ACCEPTED_EXTENSIONS, ffprobe_available
-from app.pose.runtime import probe
+from app.media.transcode import ffmpeg_available
+from app.pose.runtime import probe, selftest
 from app.storage import get_storage
 
 router = APIRouter(tags=["health"])
 
-# Flipped to True only when the real reference pipeline (Outcome 2) is wired end to end.
-ANALYSIS_PIPELINE_IMPLEMENTED = False
+# The real reference pipeline (Outcome 2: transcode → MediaPipe → features → quality gates).
+ANALYSIS_PIPELINE_IMPLEMENTED = True
 
 
 class ComponentState(BaseModel):
@@ -33,6 +36,8 @@ class AnalysisState(BaseModel):
     model_present: bool
     model_verified: bool
     model_version: str
+    runtime_selftest: bool
+    worker_running: bool
     reason: str | None
 
 
@@ -57,6 +62,33 @@ class HealthResponse(BaseModel):
     limits: Limits
 
 
+@dataclass(frozen=True)
+class Capability:
+    available: bool
+    reason: str | None
+    runtime_ok: bool
+    worker_ok: bool
+
+
+def analysis_capability(settings: Settings) -> Capability:
+    """Single source of truth for 'can this server analyse movement right now?'."""
+    pose = probe(settings.model_path, settings.model_sha256)
+    reason = pose.problem
+    runtime_ok = False
+    if reason is None:
+        runtime_ok, reason = selftest(settings.model_path, settings.model_sha256)
+    worker_ok = worker_available(settings)
+    if reason is None and not worker_ok:
+        reason = "The analysis worker isn't running."
+    convert_ok = ffprobe_available() and ffmpeg_available()
+    if reason is None and not convert_ok:
+        reason = "Video conversion tools are not installed."
+    available = (
+        pose.available and runtime_ok and worker_ok and convert_ok and ANALYSIS_PIPELINE_IMPLEMENTED
+    )
+    return Capability(available, None if available else reason, runtime_ok, worker_ok)
+
+
 def _storage_ok() -> bool:
     try:
         return get_storage().healthy()
@@ -75,10 +107,9 @@ def health(
     pose = probe(settings.model_path, settings.model_sha256)
     inspect_ok = ffprobe_available()
 
-    reason = pose.problem
-    if reason is None and not ANALYSIS_PIPELINE_IMPLEMENTED:
-        reason = "Movement analysis is still being built."
-    analysis_available = pose.available and ANALYSIS_PIPELINE_IMPLEMENTED
+    cap = analysis_capability(settings)
+    analysis_available = cap.available
+    reason = cap.reason
 
     persistence_ok = db_ok and revision is not None and storage_ok
     status: Literal["ready", "limited", "offline"]
@@ -116,6 +147,8 @@ def health(
             model_present=pose.model_present,
             model_verified=pose.model_verified,
             model_version=pose.model_version,
+            runtime_selftest=cap.runtime_ok,
+            worker_running=cap.worker_ok,
             reason=None if analysis_available else reason,
         ),
         limits=Limits(

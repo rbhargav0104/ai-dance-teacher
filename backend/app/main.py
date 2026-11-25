@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app import __version__
 from app.api import health, media, projects, session
@@ -17,7 +21,21 @@ def create_app() -> FastAPI:
     configure_logging()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
 
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        from app.jobs.worker import get_worker
+
+        worker = get_worker() if settings.worker_mode == "thread" else None
+        if worker is not None:
+            worker.start()
+        try:
+            yield
+        finally:
+            if worker is not None:
+                worker.stop()
+
     app = FastAPI(
+        lifespan=lifespan,
         title="AI Dance Teacher API",
         version=__version__,
         description="Private pose-based dance coaching API. Scores come only from measured movement.",  # noqa: E501
@@ -33,6 +51,7 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID", "Range"],
         expose_headers=["X-Request-ID", "Content-Range", "Accept-Ranges"],
     )
+    app.add_middleware(GZipMiddleware, minimum_size=4096)
     install_request_logging(app)
     install_error_handlers(app)
     app.include_router(health.router)

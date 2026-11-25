@@ -92,6 +92,12 @@ class ReferenceVideo(Base):
     width: Mapped[int] = mapped_column(Integer)
     height: Mapped[int] = mapped_column(Integer)
     pose_coverage: Mapped[float | None] = mapped_column(Float)
+    canonical_width: Mapped[int | None] = mapped_column(Integer)
+    canonical_height: Mapped[int | None] = mapped_column(Integer)
+    canonical_fps: Mapped[float | None] = mapped_column(Float)
+    canonical_duration: Mapped[float | None] = mapped_column(Float)
+    quality: Mapped[dict[str, Any] | None] = mapped_column(JsonType)
+    analyzed_at: Mapped[datetime | None] = mapped_column()
     warnings: Mapped[list[str]] = mapped_column(JsonType, default=list)
     pipeline_version: Mapped[str | None] = mapped_column(String(64))
     model_version: Mapped[str | None] = mapped_column(String(128))
@@ -139,6 +145,7 @@ class ReferencePoseFrame(Base):
 
     __table_args__ = (
         Index("ix_reference_pose_frames_video_ts", "reference_video_id", "timestamp"),
+        Index("ix_reference_pose_frames_video_frame", "reference_video_id", "frame_number"),
     )
 
 
@@ -246,6 +253,9 @@ class AnalysisJob(Base):
     locked_at: Mapped[datetime | None] = mapped_column()
     worker_id: Mapped[str | None] = mapped_column(String(64))
     heartbeat_at: Mapped[datetime | None] = mapped_column()
+    retryable: Mapped[bool] = mapped_column(Boolean, default=False)
+    started_at: Mapped[datetime | None] = mapped_column()
+    finished_at: Mapped[datetime | None] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 

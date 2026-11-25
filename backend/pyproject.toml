@@ -46,7 +46,10 @@ select = ["E", "F", "I", "B", "UP", "S", "N", "SIM"]
 ignore = ["S101", "N818", "SIM300"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106"]
+"tests/**" = ["S105", "S106", "S603", "S607", "N812"]
+"app/pose/**" = ["N812"]
+"app/pipeline/**" = ["N812"]
+"app/api/projects.py" = ["N812"]
 "migrations/**" = ["E501"]
 
 [tool.mypy]
@@ -56,7 +59,7 @@ plugins = ["pydantic.mypy"]
 packages = ["app"]
 
 [[tool.mypy.overrides]]
-module = ["mediapipe.*", "cv2.*"]
+module = ["mediapipe.*", "cv2.*", "scipy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

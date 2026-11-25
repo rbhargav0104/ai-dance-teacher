@@ -15,7 +15,7 @@ def test_health_limited_without_model(client: TestClient) -> None:
     body = res.json()
     assert body["status"] == "limited"
     assert body["database"]["ok"] is True
-    assert body["database"]["detail"] == "0002"
+    assert body["database"]["detail"] == "0003"
     assert body["storage"]["ok"] is True
     assert body["analysis"]["available"] is False
     assert body["analysis"]["model_present"] is False
@@ -46,9 +46,11 @@ def test_corrupt_model_is_not_verified(
     assert body["status"] == "limited"
 
 
-def test_ready_only_when_model_verified_and_pipeline_exists(
+def test_hash_ok_but_unloadable_model_stays_limited(
     client: TestClient, env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """A file that passes the SHA check but can't actually load must not flip READY."""
+    pytest.importorskip("mediapipe")
     from app.config import get_settings
 
     model = env / "models" / "missing.task"
@@ -59,11 +61,34 @@ def test_ready_only_when_model_verified_and_pipeline_exists(
     )
     body = client.get("/api/health").json()
     assert body["analysis"]["model_verified"] is True
-    # The pipeline itself is not built yet, so the server must still say LIMITED.
+    assert body["analysis"]["runtime_selftest"] is False
     assert body["status"] == "limited"
-    monkeypatch.setattr(health_module, "ANALYSIS_PIPELINE_IMPLEMENTED", True)
+    assert "failed to load" in body["analysis"]["reason"]
+
+
+def test_ready_with_real_model_and_worker(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("mediapipe")
+    from app.config import REPO_ROOT, get_settings
+
+    real = REPO_ROOT / "models" / "pose_landmarker_full.task"
+    if not real.is_file():
+        pytest.skip("pose model not downloaded")
+    monkeypatch.setattr(get_settings(), "model_path", real)
     body = client.get("/api/health").json()
-    assert body["status"] == ("ready" if body["analysis"]["runtime_installed"] else "limited")
+    assert body["status"] == "ready", body
+    assert body["analysis"]["runtime_selftest"] is True
+    assert body["analysis"]["worker_running"] is True
+
+    # Without a worker, the same server must say LIMITED.
+    monkeypatch.setattr(get_settings(), "worker_mode", "off")
+    body = client.get("/api/health").json()
+    assert body["status"] == "limited"
+    assert "worker" in body["analysis"]["reason"]
+    monkeypatch.setattr(get_settings(), "worker_mode", "manual")
+    monkeypatch.setattr(health_module, "ANALYSIS_PIPELINE_IMPLEMENTED", False)
+    assert client.get("/api/health").json()["status"] == "limited"
 
 
 def test_liveness_and_openapi(client: TestClient) -> None:

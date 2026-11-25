@@ -16,8 +16,10 @@ pytest_plugins = ["tests.media_factory"]
 def _clear_caches() -> None:
     from app.config import get_settings
     from app.db.session import get_engine, get_sessionmaker
+    from app.jobs.worker import reset_worker
     from app.storage import get_storage
 
+    reset_worker()
     for fn in (get_settings, get_engine, get_sessionmaker, get_storage):
         fn.cache_clear()
 
@@ -34,6 +36,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("MODEL_PATH", str(tmp_path / "models" / "missing.task"))
     monkeypatch.setenv("SECRET_KEY", "test-secret-key-that-is-long-enough-123456")
+    monkeypatch.setenv("WORKER_MODE", "manual")
     monkeypatch.delenv("DATABASE_URL", raising=False)
     _clear_caches()
     yield tmp_path
