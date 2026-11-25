@@ -29,6 +29,7 @@ STAGE_MESSAGES = {
     "preparing": "Preparing a steady 24 fps copy of your video…",
     "tracking": "Tracking the dancer's body frame by frame…",
     "saving": "Saving landmarks and measurements…",
+    "segmenting": "Suggesting teachable sections…",
 }
 
 

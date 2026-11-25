@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-25 ~15:00 IST (build session 3)_
+_Last updated: 2026-11-26 ~02:30 IST (build session 4)_
 
 ## Outcomes
 
@@ -9,7 +9,7 @@ _Last updated: 2026-11-25 ~15:00 IST (build session 3)_
 | 0 | Engineering foundation | **tested** | Exit gate met: clean clone → `scripts/setup.sh` → `scripts/dev.sh` → health + session + /me reachable directly and via the web proxy (`scripts/smoke.sh`). CI runs the same boot smoke. |
 | 1 | Robust private reference intake | **tested** | Exit gate met (see below). Gap: no licence-verified *full-body* reference clip found yet — both committed samples crop the dancer above the knees. |
 | 2 | Real reference pose + debugger | **tested** | Exit gate met (evidence below). Delivered a session early. Postgres `SKIP LOCKED` claiming deferred to Outcome 10 as planned. |
-| 3 | Teachable sections | planned | |
+| 3 | Teachable sections | **tested** | Exit gate met (evidence below). Avatar retargeting maths started (`frontend/lib/avatar/retarget.ts`, unit-tested). |
 | 4 | Teacher Mode — **3D AI avatar teacher with voice** | planned | Scope changed by the owner on Nov 25 (docs/SPEC_AMENDMENTS.md A1). Target Nov 27–28. |
 | 5 | Learner capture + real learner pose | planned | |
 | 6 | Normalized alignment | planned | |
@@ -19,7 +19,21 @@ _Last updated: 2026-11-25 ~15:00 IST (build session 3)_
 | 10 | Production identity + durable infra | planned | |
 | 11 | Stable deployment + full acceptance | planned | |
 
-States: planned → implemented → tested → deployed. Ahead of schedule (Nov 26 target = Outcome 2, done Nov 25 pm).
+States: planned → implemented → tested → deployed. On the revised plan: Outcome 3 done in the Nov 26 am session; Outcome 4 (3D avatar) starts next.
+
+### Outcome 3 exit gate — evidence
+- *Sections cover the whole video without gap/overlap*: analysis now ends with a `segmenting` stage that suggests
+  sections from stored measurements (`app/pose/segmentation.py`: motion energy, local pauses, direction reversals,
+  pose transitions; DP prefers 3–7 s, 2–8 s hard limits). Pure tests cover short clip, long continuous movement, clear
+  pauses (cuts land within 0.6 s of each pause), no movement, missing pose spans, sparse frames. Real-footage tests
+  assert full tiling on the Mixkit clip (2 sections: 0–6.917, 6.917–14.0; boy clip 3 sections).
+- *Edits persist*: `PATCH /api/projects/{id}/segments` validated server-side (`sections_gap`, `sections_overlap`,
+  `sections_incomplete`, `section_too_short`, `unknown_section`, `too_many_sections` → 422, nothing changed);
+  unchanged sections keep thumbnail/instruction/completion, moved ones get fresh midpoint thumbnails + instructions and
+  `manual`; split / merge / regenerate tested through the API and in the browser (split → save → reload keeps 3 sections).
+- *Every section loops accurately*: player acts one frame (1/24 s) before the section end via `requestVideoFrameCallback`
+  (rAF fallback). Playwright at 1× on the 0–6.917 s section for 2.3 loops: max currentTime 6.903 s, 2 wraps, never
+  entered the next section. Pure loop rule unit-tested.
 
 ### Outcome 2 exit gate — evidence
 - *Real sample/upload → correctly aligned skeleton*: `test_sample_reference_yields_aligned_skeleton_and_features` runs the
@@ -42,6 +56,15 @@ States: planned → implemented → tested → deployed. Ahead of schedule (Nov 
 - *Refresh preserves project/job state*: `test_list_get_refresh_and_delete_cascade` reads the project + intake job from a fresh app instance; Playwright flow reloads `/studio` and the library shows the uploads.
 
 ## What exists today
+
+- **Learn Mode + teachable sections (Outcome 3)**: an analysed dance opens on a section player — large canonical video
+  (mirrored by default), Play/Restart/±1 analysed frame, 0.25/0.5/0.75/1× speed, Loop, Mirror, Skeleton toggles; a
+  timeline of section chips with midpoint thumbnails and a playhead; **Edit sections** mode with draggable (and
+  keyboard ← → / Shift) boundary handles, Split at playhead, Merge with next, Reset to automatic, Save/Cancel. The side
+  card shows the section, an **experimental** instruction worded only from measured facts (arm above shoulder, travel,
+  knee bend only when legs were tracked, elbow bend, lean, relative pace), which swaps sides between mirror and direct
+  view, per-section tracked-frame coverage, "not tracked here" limbs, Mark complete, Previous/Next.
+  API: `GET/PATCH /api/projects/{id}/segments`, `PATCH /segments/{sid}` (title/completed), `POST /segments/regenerate`.
 
 - **Reference analysis (Outcome 2)**: **Analyze Choreography** (or picking a sample) queues a durable job. The in-process
   worker makes a 24 fps H.264 canonical copy + poster, runs MediaPipe Pose Landmarker (VIDEO mode, 12 fps, up to 2 people),
@@ -75,6 +98,14 @@ States: planned → implemented → tested → deployed. Ahead of schedule (Nov 
 - **CI** (`.github/workflows/ci.yml`): backend ruff + mypy strict + pytest (incl. real model load) + pose smoke;
   frontend eslint + tsc + vitest + build; end-to-end boot smoke.
 
+## Verified claims — session 4 (2026-11-26 am)
+
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 169 passed.
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 50 passed.
+- `scripts/smoke.sh` on built web + API (READY) → SMOKE OK incl. sections: full coverage, thumbnail, edit, 422 on a bad edit, regenerate.
+- `node scripts/e2e/learn-mode.cjs` (Playwright, 1440×900 + iPhone 13): loop accuracy above, mirror swaps instruction
+  sides, split+save persists across reload, mark complete, no console errors, no horizontal overflow. Screenshots reviewed.
+
 ## Verified claims — session 3 (2026-11-25 pm)
 
 - `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 133 passed
@@ -107,6 +138,10 @@ States: planned → implemented → tested → deployed. Ahead of schedule (Nov 
 - Not built yet: the 3D avatar teacher (Outcome 4, owner amendment A1). Today a dance page shows the video with a
   skeleton overlay and a developer debugger. Those are analysis views, not the teaching experience.
 - Library cards show an empty placeholder instead of the poster frame; studio sample copy still says "once analysis is on".
+- Section instructions use 2-D image-plane angles (foreshortening can under-read elbow angles, e.g. "about 20°") and assume
+  the dancer faces the camera; labelled experimental. Boundary tuning is checked on 2 real clips + synthetic sequences.
+- While editing, chips whose boundaries moved show no thumbnail until saved (server regenerates them).
+- World landmarks used by the avatar are stored raw; the avatar will smooth them (One-Euro) client-side in Outcome 4.
 
 - Smoothing parameters and gate thresholds (55%/85% coverage, 20% multi-person, 0.5 visibility) are spec defaults checked
   on 2 clips + variants only; recalibrate with more fixtures (Outcome 7).
@@ -131,6 +166,9 @@ The one-click Codespaces path lands on Dec 3. Until then:
    `scripts/setup.sh && scripts/dev.sh`, then
    - http://localhost:3000/studio?demo=1 → **Use this sample** → watch the progress ring (~10 s) → the skeleton tracks the
      dancer on the video → **Open pose debugger** → step frames with ← / →, toggle IDs, click landmarks;
+   - on the dance page, pick a section on the timeline, press play (it loops the section at 0.5×), try 0.25×, Mirror off
+     (the instruction swaps left/right), **Edit sections** → drag a lime handle / Split at playhead → **Save sections**,
+     reload, then **Mark complete** and **Next section**;
    - upload your own MP4/MOV/WebM at http://localhost:3000/studio → **Analyze Choreography**. A clip with two people, or one
      where you leave the frame for most of it, should stop with a clear explanation instead of a result.
 

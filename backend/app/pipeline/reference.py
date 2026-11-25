@@ -188,4 +188,12 @@ def run_reference_analysis(
 
     if report.failure is not None:
         raise AnalysisFailed(report.failure, report.failure_message or report.failure)
+
+    # --- segmenting: suggested teachable sections from the stored measurements -------------
+    progress("segmenting", 0.985)
+    from app.services.sections import generate_automatic
+
+    db.refresh(project)
+    generate_automatic(db, storage, settings, project, require_analysed=False)
+    progress("segmenting", 0.995)
     return AnalysisOutcome(report.coverage, report.warnings, len(rows))

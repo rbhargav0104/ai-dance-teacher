@@ -78,6 +78,8 @@ export function stageLabel(stage: string | null | undefined): string {
       return "Tracking the body frame by frame";
     case "saving":
       return "Saving landmarks and measurements";
+    case "segmenting":
+      return "Suggesting teachable sections";
     default:
       return "Working";
   }

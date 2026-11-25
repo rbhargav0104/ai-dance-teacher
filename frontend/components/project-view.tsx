@@ -9,6 +9,7 @@ import { formatBytes, formatDuration, warningLabel } from "@/lib/media";
 import type { PosesResponse, Project } from "@/lib/types";
 
 import { AnalysisFailure, AnalysisProgress, TrackingSummary } from "./analysis-status";
+import { LearnStudio } from "./learn-studio";
 import { SkeletonOverlay } from "./skeleton-overlay";
 
 import { StatusChip } from "./project-list";
@@ -154,6 +155,8 @@ export function ProjectView() {
   const canStart =
     p.status === "uploaded" || (p.status === "failed" && (job?.retryable || RETRYABLE.has(p.error_code ?? "")));
   const overlay = analyzed && poses && hasCanonical && showSkeleton && src && !videoError;
+  // Analysed dances open in Learn Mode: section player + editable timeline on the canonical copy.
+  const learn = analyzed && hasCanonical && src !== null && !videoError;
 
   const start = async () => {
     setStarting(true);
@@ -168,55 +171,8 @@ export function ProjectView() {
     }
   };
 
-  return (
-    <Wrap>
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <StatusChip status={p.status} />
-        {p.is_demo && (
-          <span className="rounded-full bg-lime/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-lime">
-            Sample clip · Mixkit Free License
-          </span>
-        )}
-      </div>
-      <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-5xl">{p.title}</h1>
-
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="relative self-start overflow-hidden rounded-3xl border border-line bg-black">
-          {src && !videoError ? (
-            <div className="relative aspect-video max-h-[70vh] w-full">
-              <video
-                ref={videoRef}
-                key={src}
-                src={src}
-                controls
-                playsInline
-                preload="metadata"
-                className="absolute inset-0 h-full w-full bg-black object-contain"
-                onError={() => setVideoError(true)}
-              />
-              {overlay && <SkeletonOverlay videoRef={videoRef} poses={poses} />}
-            </div>
-          ) : (
-            <div className="flex aspect-video flex-col items-center justify-center gap-3 p-6 text-center text-muted">
-              {videoError ? (
-                <>
-                  <p>This browser can&apos;t play the original file. A playback copy is made during analysis.</p>
-                  <button
-                    type="button"
-                    onClick={() => fetchMedia(hasCanonical ? "canonical" : "source")}
-                    className="rounded-full border border-line px-4 py-2 text-sm text-ink"
-                  >
-                    Reload video
-                  </button>
-                </>
-              ) : (
-                <p className="animate-pulse">Loading private video…</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        <aside className="flex flex-col gap-6">
+  const asideBody = (
+    <>
           {ref && (
             <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line">
               <Fact label="Length" value={formatDuration(ref.duration)} />
@@ -244,7 +200,7 @@ export function ProjectView() {
 
           {analyzed ? (
             <div className="flex flex-col gap-3">
-              {poses && (
+              {poses && !learn && (
                 <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3 text-sm">
                   <span>Show measured skeleton</span>
                   <input
@@ -257,12 +213,12 @@ export function ProjectView() {
               )}
               <Link
                 href={`/studio/projects/${p.id}/debug`}
-                className="inline-flex h-14 w-full items-center justify-center rounded-full bg-lime px-6 font-display text-sm font-semibold uppercase tracking-[0.12em] text-studio transition hover:-translate-y-0.5"
+                className="inline-flex h-12 w-full items-center justify-center rounded-full border border-line px-6 font-display text-xs font-semibold uppercase tracking-[0.12em] text-ink transition hover:-translate-y-0.5 hover:border-lime/60"
               >
                 Open pose debugger
               </Link>
               <p className="text-sm text-muted">
-                Every joint, angle and confidence value measured from this video. Sections and Learn Mode come next.
+                Every joint, angle and confidence value measured from this video. The 3D avatar teacher is being built next.
               </p>
             </div>
           ) : busy ? null : p.status === "failed" && !canStart ? (
@@ -328,8 +284,69 @@ export function ProjectView() {
               </button>
             )}
           </div>
-        </aside>
+    </>
+  );
+
+  return (
+    <Wrap>
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <StatusChip status={p.status} />
+        {p.is_demo && (
+          <span className="rounded-full bg-lime/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-lime">
+            Sample clip · Mixkit Free License
+          </span>
+        )}
       </div>
+      <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-5xl">{p.title}</h1>
+
+      {learn ? (
+        <LearnStudio
+          projectId={p.id}
+          src={src}
+          poses={poses}
+          onVideoError={() => setVideoError(true)}
+          aside={asideBody}
+        />
+      ) : (
+      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="relative self-start overflow-hidden rounded-3xl border border-line bg-black">
+            {src && !videoError ? (
+              <div className="relative aspect-video max-h-[70vh] w-full">
+                <video
+                  ref={videoRef}
+                  key={src}
+                  src={src}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="absolute inset-0 h-full w-full bg-black object-contain"
+                  onError={() => setVideoError(true)}
+                />
+                {overlay && <SkeletonOverlay videoRef={videoRef} poses={poses} />}
+              </div>
+            ) : (
+              <div className="flex aspect-video flex-col items-center justify-center gap-3 p-6 text-center text-muted">
+                {videoError ? (
+                  <>
+                    <p>This browser can&apos;t play the original file. A playback copy is made during analysis.</p>
+                    <button
+                      type="button"
+                      onClick={() => fetchMedia(hasCanonical ? "canonical" : "source")}
+                      className="rounded-full border border-line px-4 py-2 text-sm text-ink"
+                    >
+                      Reload video
+                    </button>
+                  </>
+                ) : (
+                  <p className="animate-pulse">Loading private video…</p>
+                )}
+              </div>
+            )}
+          </div>
+  
+    <aside className="flex flex-col gap-6">{asideBody}</aside>
+        </div>
+      )}
     </Wrap>
   );
 }

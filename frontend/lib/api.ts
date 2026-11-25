@@ -9,6 +9,9 @@ import type {
   ProjectList,
   PosesResponse,
   Sample,
+  Section,
+  SectionEdit,
+  SectionsResponse,
   SessionResponse,
 } from "./types";
 
@@ -129,6 +132,23 @@ export const startAnalysis = (id: string, rerun = false) =>
   });
 export const getPoses = (id: string) =>
   authed<PosesResponse>(`/api/projects/${encodeURIComponent(id)}/poses`);
+const sectionsPath = (id: string) => `/api/projects/${encodeURIComponent(id)}/segments`;
+export const getSections = (id: string) => authed<SectionsResponse>(sectionsPath(id));
+/** Replace the section list (validated server-side: full coverage, no gaps or overlaps). */
+export const saveSections = (id: string, sections: SectionEdit[]) =>
+  authed<SectionsResponse>(sectionsPath(id), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sections }),
+  });
+export const updateSection = (id: string, sectionId: string, patch: { title?: string; completed?: boolean }) =>
+  authed<Section>(`${sectionsPath(id)}/${encodeURIComponent(sectionId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+export const regenerateSections = (id: string) =>
+  authed<SectionsResponse>(`${sectionsPath(id)}/regenerate`, { method: "POST" });
 export const listSamples = async () => parse<Sample[]>(await raw("/api/samples"));
 export const addSample = (sampleId: string) =>
   authed<Project>("/api/projects/sample", {

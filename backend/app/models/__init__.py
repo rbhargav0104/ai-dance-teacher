@@ -121,6 +121,9 @@ class DanceSegment(Base):
     thumbnail_key: Mapped[str | None] = mapped_column(String(512))
     boundary_source: Mapped[str] = mapped_column(String(16), default="automatic")
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    coverage: Mapped[float | None] = mapped_column(Float)
+    facts: Mapped[dict[str, Any] | None] = mapped_column(JsonType)
+    algorithm_version: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 

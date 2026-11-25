@@ -15,7 +15,7 @@ def test_health_limited_without_model(client: TestClient) -> None:
     body = res.json()
     assert body["status"] == "limited"
     assert body["database"]["ok"] is True
-    assert body["database"]["detail"] == "0003"
+    assert body["database"]["detail"] == "0004"
     assert body["storage"]["ok"] is True
     assert body["analysis"]["available"] is False
     assert body["analysis"]["model_present"] is False

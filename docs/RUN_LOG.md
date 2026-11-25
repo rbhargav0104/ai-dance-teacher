@@ -91,3 +91,27 @@ experimental instructions from measured features only. Also library-card poster 
   **full 3D avatar** and **spoken cues**. Recorded as spec amendment A1 (docs/SPEC_AMENDMENTS.md), DECISIONS.md entry,
   re-paced IMPLEMENTATION_PLAN.md (avatar = Outcome 4, Nov 27–28), CLAUDE.md now points sessions at the amendment.
 - No code changed for this yet. Next session (Nov 26 01:43): Outcome 3 sections + avatar retargeting maths with unit tests.
+
+## 2026-11-26 01:43–02:35 IST — build session 4 (Outcome 3 + avatar maths start)
+Start: Outcome 2 gate re-checked — `scripts/setup.sh`, ruff + mypy clean, full pytest green (133 at that commit).
+`add_repo`/`register_repo_root` weren't offered again; the repo was already cloned with push access.
+
+Delivered:
+- Backend: `pose/segmentation.py` (cut scores + DP, deterministic), `pose/section_rules.py` (numpy-free validation, so
+  LIMITED can still list sections), `pose/instructions.py` (measured facts → mirror/direct wording, experimental),
+  `services/sections.py` (automatic, edit, thumbnails under `{project}/sections/`), `api/sections.py`, migration `0004`
+  (segment coverage, facts, algorithm version), `segmenting` job stage.
+- Frontend: `components/learn-studio.tsx` (section player, transport, timeline editor, section card), `lib/sections.ts`
+  (split/merge/move with guaranteed coverage, loop rule), `lib/avatar/retarget.ts` (world→avatar space, fixed median bone
+  lengths, ghosted untracked bones, mirror mapping, angle check helper).
+- `scripts/smoke.sh` checks sections; `scripts/e2e/learn-mode.cjs` browser check.
+
+Commands and results:
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 169 passed.
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 50 passed.
+- `scripts/smoke.sh` (READY, built web) → SMOKE OK; sample sections [(0.0, 6.917), (6.917, 14.0)].
+- `node scripts/e2e/learn-mode.cjs` → loop max 6.903 s < 6.917 s end, 2 wraps; reload keeps edits; no console errors/overflow.
+
+Next (Nov 26 pm / Nov 27, Outcome 4): three.js + R3F stage, procedural mannequin driven by `lib/avatar/retarget.ts`
+(client-side One-Euro smoothing of world landmarks), ghosted untracked limbs with labels, avatar in Learn Mode synced
+to the section player (loop/speed/mirror), camera presets, PiP video, WebGL fallback; Playwright avatar-vs-landmark check.

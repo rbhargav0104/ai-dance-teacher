@@ -194,3 +194,48 @@ export interface PosesResponse {
   angle_definitions: Record<string, [number, number, number]>;
   frames: PoseFrame[];
 }
+
+export interface SectionFact {
+  kind: string;
+  side: "left" | "right" | "both" | null;
+  value: number | null;
+  mirror: string;
+  direct: string;
+}
+
+export interface Section {
+  id: string;
+  position: number;
+  start: number;
+  end: number;
+  title: string;
+  /** Mirror perspective (default): the learner uses the dancer's own body side. */
+  instruction: string | null;
+  /** Video not mirrored: sides swap, as when following the screen like a reflection. */
+  instruction_direct: string | null;
+  instruction_experimental: boolean;
+  facts: SectionFact[];
+  untracked: string[];
+  coverage: number | null;
+  boundary_source: "automatic" | "manual";
+  completed: boolean;
+  thumbnail_url: string | null;
+  algorithm_version: string | null;
+}
+
+export interface SectionsResponse {
+  project_id: string;
+  duration: number;
+  min_section_seconds: number;
+  max_sections: number;
+  thumbnail_expires_in: number;
+  sections: Section[];
+}
+
+export interface SectionEdit {
+  id?: string;
+  start: number;
+  end: number;
+  title?: string | null;
+  completed?: boolean | null;
+}

@@ -34,6 +34,20 @@ if [[ "$STATUS" == "ready" ]]; then
   [[ "$PSTATUS" == "analyzed" ]] || { echo "analysis did not finish: $PSTATUS"; exit 1; }
   curl -fsS "$WEB/api/projects/$PID/poses" -H "Authorization: Bearer $WTOKEN" \
     | py 'v=sum(f["valid"] for f in d["frames"]); print("frames", len(d["frames"]), "valid", v, "coverage", d["coverage"], "warnings", d["quality"]["warnings"]); assert len(d["frames"])>100 and d["coverage"]>0.55'
+  echo "-- teachable sections (full coverage, thumbnail, edit, regenerate)"
+  SECS="$(curl -fsS "$WEB/api/projects/$PID/segments" -H "Authorization: Bearer $WTOKEN")"
+  echo "$SECS" | py 's=d["sections"]; print("sections", [(x["start"], x["end"]) for x in s]); assert s[0]["start"]==0 and abs(s[-1]["end"]-d["duration"])<1e-3 and all(a["end"]==b["start"] for a,b in zip(s,s[1:]))'
+  THUMB="$(echo "$SECS" | py 'print(d["sections"][0]["thumbnail_url"])')"
+  curl -fsS -o /dev/null "$WEB$THUMB" && echo "thumbnail ok"
+  DUR="$(echo "$SECS" | py 'print(d["duration"])')"
+  curl -fsS -X PATCH "$WEB/api/projects/$PID/segments" -H "Authorization: Bearer $WTOKEN" \
+    -H "Content-Type: application/json" -d "{\"sections\": [{\"start\": 0, \"end\": $DUR}]}" \
+    | py 'assert len(d["sections"])==1 and d["sections"][0]["boundary_source"]=="manual"; print("edit ok")'
+  code="$(curl -s -o /dev/null -w '%{http_code}' -X PATCH "$WEB/api/projects/$PID/segments" -H "Authorization: Bearer $WTOKEN" \
+    -H "Content-Type: application/json" -d '{"sections": [{"start": 0, "end": 1}]}')"
+  [[ "$code" == "422" ]] || { echo "expected 422 for an incomplete edit, got $code"; exit 1; }
+  curl -fsS -X POST "$WEB/api/projects/$PID/segments/regenerate" -H "Authorization: Bearer $WTOKEN" \
+    | py 'assert len(d["sections"])>=2; print("regenerate ok")'
 else
   echo "-- server is $STATUS: analysis must be refused with 503"
   code="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$WEB/api/projects/$PID/analysis" -H "Authorization: Bearer $WTOKEN")"
