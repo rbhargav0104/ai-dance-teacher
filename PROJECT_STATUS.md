@@ -160,7 +160,7 @@ _None. The owner only tests. Sessions source every asset themselves (see `docs/S
 ## How Bhargav can test right now
 
 The one-click Codespaces path lands on Dec 3. Until then:
-1. Open the repo's **Actions** tab: the latest **CI** run is green (verified for de45e83) (backend incl. real-footage analysis tests, frontend, smoke
+1. Open the repo's **Actions** tab: the latest **CI** run is green (verified for 037ecfe) (backend incl. real-footage analysis tests, frontend, smoke
    which analyses the sample end to end on a READY server and checks LIMITED mode without the vision stack).
 2. Optional, on a machine with Node 20+, [uv](https://docs.astral.sh/uv/) and ffmpeg (Linux also: `libegl1 libgles2 libgl1`):
    `scripts/setup.sh && scripts/dev.sh`, then

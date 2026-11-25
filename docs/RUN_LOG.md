@@ -115,3 +115,4 @@ Commands and results:
 Next (Nov 26 pm / Nov 27, Outcome 4): three.js + R3F stage, procedural mannequin driven by `lib/avatar/retarget.ts`
 (client-side One-Euro smoothing of world landmarks), ghosted untracked limbs with labels, avatar in Learn Mode synced
 to the section player (loop/speed/mirror), camera presets, PiP video, WebGL fallback; Playwright avatar-vs-landmark check.
+- CI run 45697822079 (037ecfe) → **green** (frontend, backend, smoke incl. sections in READY and LIMITED).
