@@ -1,10 +1,13 @@
 import type {
   ApiErrorBody,
   HealthResponse,
+  JobInfo,
+  MediaKind,
   MediaUrl,
   MeResponse,
   Project,
   ProjectList,
+  PosesResponse,
   Sample,
   SessionResponse,
 } from "./types";
@@ -115,10 +118,17 @@ export const getProject = (id: string) =>
   authed<Project>(`/api/projects/${encodeURIComponent(id)}`);
 export const deleteProject = (id: string) =>
   authed<void>(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
-export const getSourceMedia = (id: string) =>
-  authed<MediaUrl>(`/api/projects/${encodeURIComponent(id)}/media/source`);
-export const startAnalysis = (id: string) =>
-  authed<unknown>(`/api/projects/${encodeURIComponent(id)}/analysis`, { method: "POST" });
+export const getMedia = (id: string, kind: MediaKind = "source") =>
+  authed<MediaUrl>(`/api/projects/${encodeURIComponent(id)}/media/${kind}`);
+export const getSourceMedia = (id: string) => getMedia(id, "source");
+export const startAnalysis = (id: string, rerun = false) =>
+  authed<JobInfo>(`/api/projects/${encodeURIComponent(id)}/analysis`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rerun }),
+  });
+export const getPoses = (id: string) =>
+  authed<PosesResponse>(`/api/projects/${encodeURIComponent(id)}/poses`);
 export const listSamples = async () => parse<Sample[]>(await raw("/api/samples"));
 export const addSample = (sampleId: string) =>
   authed<Project>("/api/projects/sample", {

@@ -55,3 +55,29 @@ Next (Nov 26, Outcome 2): canonical transcode job (24 fps H.264, ≤1280 px), re
 quality gates (coverage, multi-person, cropped body — both samples should warn), stored frames, skeleton viewer/debugger,
 demo project produced by the real pipeline, cached runtime self-test in /api/health, flip LIMITED → READY only when it all works.
 - CI run 4 (30816b5) → **green** (backend, frontend, smoke incl. intake via proxy).
+
+## 2026-11-25 13:44–15:10 IST — build session 3 (Outcome 2, a session early)
+Start: Outcome 1 gate re-checked — `scripts/setup.sh`, `uv run pytest` 111 passed (as recorded), repo at be786a6.
+The `add_repo`/`register_repo_root` tools weren't offered in this run; the repo was already cloned with push access, so work continued.
+
+Delivered:
+- Backend: `media/transcode.py`, `pose/{landmarks,smoothing,features,quality,extract}.py`, `pipeline/reference.py`,
+  `jobs/{queue,worker}.py`, migration `0003`, `POST /analysis` (202/200/503), `GET /poses`, `media/{source,canonical,poster}`,
+  READY gated on a real load self-test + worker + ffmpeg, GZip for large pose payloads, sample auto-analysis.
+- Frontend: live progress ring (polling, survives refresh), skeleton overlay on the canonical video, tracking summary,
+  actionable failure states, `/studio/projects/[id]/debug` pose debugger (desktop + mobile).
+- CI: smoke job installs the vision stack + model and analyses the sample through the web proxy, then re-runs smoke in LIMITED mode.
+
+Commands and results:
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 133 passed.
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 33 passed.
+- `scripts/smoke.sh` (READY) → SMOKE OK; sample: 168 frames, 149 valid, coverage 0.887, warnings [cropped_body].
+- Playwright 1440×900 + iPhone 13: sample → progress → overlay → debugger; two-dancer upload → `multiple_people` failure; no
+  console errors, no horizontal overflow. The skeleton visibly tracks both sample dancers.
+
+Notes: the `frontend-design` skill isn't available in this environment; UI follows the spec tokens already in globals.css.
+Still no licence-verified full-body clip (feet) — both references are cropped; leg features are masked honestly.
+
+Next (Nov 26, Outcome 3): automatic section boundaries from motion energy/pauses/pose change, thumbnails (poster per section),
+editable timeline (split/merge/drag, persisted, full coverage without gaps/overlap), section loop/speed/mirror playback,
+experimental instructions from measured features only. Also library-card poster thumbnails; another full-body fixture search.

@@ -21,6 +21,8 @@ export interface HealthResponse {
     model_present: boolean;
     model_verified: boolean;
     model_version: string;
+    runtime_selftest?: boolean;
+    worker_running?: boolean;
     reason: string | null;
   };
   limits: {
@@ -61,6 +63,36 @@ export interface ReferenceInfo {
   codec: string | null;
   has_audio: boolean | null;
   warnings: string[];
+  canonical_width?: number | null;
+  canonical_height?: number | null;
+  canonical_fps?: number | null;
+  canonical_duration?: number | null;
+  has_canonical?: boolean;
+  has_poster?: boolean;
+  analysis_fps?: number | null;
+  pose_coverage?: number | null;
+  quality?: QualityReport | null;
+  pipeline_version?: string | null;
+  model_version?: string | null;
+  analyzed_at?: string | null;
+}
+
+export interface QualityReport {
+  analyzed_frames: number;
+  valid_frames: number;
+  coverage: number;
+  multi_person_fraction: number;
+  feet_visible_fraction: number;
+  mean_confidence: number;
+  measured_joint_confidence?: number;
+  interpolated_frames: number;
+  failure: string | null;
+  failure_message: string | null;
+  warnings: string[];
+  excluded_joints: Record<string, number>;
+  torso_scale?: number | null;
+  thresholds?: Record<string, number>;
+  smoothing?: string;
 }
 
 export interface JobInfo {
@@ -71,6 +103,8 @@ export interface JobInfo {
   progress: number;
   message: string | null;
   error_code: string | null;
+  attempts?: number;
+  retryable?: boolean;
   updated_at: string;
 }
 
@@ -105,5 +139,58 @@ export interface MediaUrl {
   url: string;
   expires_in: number;
   content_type: string;
-  kind: "source";
+  kind: MediaKind;
+}
+
+export type MediaKind = "source" | "canonical" | "poster";
+
+/** [x, y, z, visibility, presence] in image-normalized coordinates. */
+export type Landmark = [number, number, number, number, number];
+export type Point3 = [number, number, number];
+
+export interface PoseFrameData {
+  poses_detected: number;
+  landmarks: Landmark[] | null;
+  smoothed: (Point3 | null)[];
+  reliable: boolean[];
+  interpolated: boolean[];
+  normalized: (Point3 | null)[];
+  world: Point3[] | null;
+  angles: Record<string, number | null>;
+  root: [number | null, number | null];
+  travel: [number | null, number | null];
+  com_estimate: [number | null, number | null];
+  speed: (number | null)[];
+  motion_energy: number | null;
+  torso_lean: number | null;
+  shoulder_tilt: number | null;
+  hip_tilt: number | null;
+  yaw_experimental: number | null;
+}
+
+export interface PoseFrame {
+  t: number;
+  frame: number;
+  valid: boolean;
+  confidence: number;
+  data: PoseFrameData;
+}
+
+export interface PosesResponse {
+  project_id: string;
+  status: string;
+  pipeline_version: string | null;
+  model_version: string | null;
+  analysis_fps: number | null;
+  width: number | null;
+  height: number | null;
+  duration: number | null;
+  coverage: number | null;
+  quality: QualityReport | null;
+  landmark_names: string[];
+  connections: [number, number][];
+  core_landmarks: number[];
+  major_landmarks: number[];
+  angle_definitions: Record<string, [number, number, number]>;
+  frames: PoseFrame[];
 }

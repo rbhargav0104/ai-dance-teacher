@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-25 ~02:30 IST (build session 2)_
+_Last updated: 2026-11-25 ~15:00 IST (build session 3)_
 
 ## Outcomes
 
@@ -8,7 +8,7 @@ _Last updated: 2026-11-25 ~02:30 IST (build session 2)_
 |---|---|---|---|
 | 0 | Engineering foundation | **tested** | Exit gate met: clean clone → `scripts/setup.sh` → `scripts/dev.sh` → health + session + /me reachable directly and via the web proxy (`scripts/smoke.sh`). CI runs the same boot smoke. |
 | 1 | Robust private reference intake | **tested** | Exit gate met (see below). Gap: no licence-verified *full-body* reference clip found yet — both committed samples crop the dancer above the knees. |
-| 2 | Real reference pose + debugger | planned | Pose model download + real MediaPipe load verified (`python -m app.pose.verify`). |
+| 2 | Real reference pose + debugger | **tested** | Exit gate met (evidence below). Delivered a session early. Postgres `SKIP LOCKED` claiming deferred to Outcome 10 as planned. |
 | 3 | Teachable sections | planned | |
 | 4 | Teacher Mode | planned | |
 | 5 | Learner capture + real learner pose | planned | |
@@ -19,7 +19,22 @@ _Last updated: 2026-11-25 ~02:30 IST (build session 2)_
 | 10 | Production identity + durable infra | planned | |
 | 11 | Stable deployment + full acceptance | planned | |
 
-States: planned → implemented → tested → deployed. On schedule (Nov 25 target = Outcome 1).
+States: planned → implemented → tested → deployed. Ahead of schedule (Nov 26 target = Outcome 2, done Nov 25 pm).
+
+### Outcome 2 exit gate — evidence
+- *Real sample/upload → correctly aligned skeleton*: `test_sample_reference_yields_aligned_skeleton_and_features` runs the
+  real worker + MediaPipe on the committed Mixkit clip: 168 frames at 12 fps, 89% coverage, `cropped_body` warning; for
+  sampled valid frames the torso midline lands on the dancer's (non-green) pixels in the canonical video and a background
+  point stays green; nose above shoulders above hips on every valid frame; angles in 0–180°, ankle angles null (feet hidden).
+- *Inspectable landmarks/angles*: `GET /api/projects/{id}/poses` + `/studio/projects/{id}/debug` (video + skeleton with IDs,
+  frame stepping, per-frame confidence/angles/normalized pose/travel/energy/excluded joints, versions). Screenshots reviewed
+  at 1440×900 and iPhone 13; no console errors, no horizontal overflow.
+- *Low-quality and multi-person clips fail honestly* (real footage, FFmpeg variants generated in the test):
+  two dancers side by side → `multiple_people`; dancer hidden for 10 of 14 s → `low_coverage` ("trackable in N%");
+  empty scene → `no_dancer_detected`. Failed jobs are non-retryable; frames stay inspectable.
+- *Real progress and recovery*: worker heartbeats stage + fraction; lapsed lease → requeue, 3rd interruption → failed/retryable;
+  project stuck "processing" without a job → repaired; delete during a job → job stops, no stored objects remain; idempotent
+  re-requests return the active job. `scripts/smoke.sh` on a READY server analyses the sample through the web proxy.
 
 ### Outcome 1 exit gate — evidence
 - *Valid media persists privately*: `test_valid_upload_persists_privately` (object stored 0600, bytes identical, no keys/paths in responses), MP4/MOV/WebM accepted; signed media URLs with range support (`test_media.py`); 85 MB upload through the Next proxy → 201 in 0.3 s (manual).
@@ -27,6 +42,13 @@ States: planned → implemented → tested → deployed. On schedule (Nov 25 tar
 - *Refresh preserves project/job state*: `test_list_get_refresh_and_delete_cascade` reads the project + intake job from a fresh app instance; Playwright flow reloads `/studio` and the library shows the uploads.
 
 ## What exists today
+
+- **Reference analysis (Outcome 2)**: **Analyze Choreography** (or picking a sample) queues a durable job. The in-process
+  worker makes a 24 fps H.264 canonical copy + poster, runs MediaPipe Pose Landmarker (VIDEO mode, 12 fps, up to 2 people),
+  follows one dancer, smooths (One-Euro), normalizes (aspect-corrected, hip root, median torso scale), measures joint angles,
+  travel, speed/energy, lean/tilts, an experimental yaw and a labelled centre-of-mass estimate, then applies quality gates.
+  The dance page shows live stage/progress (survives refresh), the tracked skeleton over the canonical video, coverage and
+  joint confidence ("not a dance score"), and actionable failures. `/studio/projects/{id}/debug` is the developer debugger.
 
 - **Reference intake (Outcome 1)**: `POST /api/projects` streams multipart to a temp file (byte limit enforced while
   streaming, extension rejected as soon as part headers arrive), FFprobe validates (timeout, argv only), then the source
@@ -53,6 +75,15 @@ States: planned → implemented → tested → deployed. On schedule (Nov 25 tar
 - **CI** (`.github/workflows/ci.yml`): backend ruff + mypy strict + pytest (incl. real model load) + pose smoke;
   frontend eslint + tsc + vitest + build; end-to-end boot smoke.
 
+## Verified claims — session 3 (2026-11-25 pm)
+
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 133 passed
+  (13 pure-math, 8 end-to-end on real footage, ~42 s total).
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 33 passed.
+- `scripts/smoke.sh` against built web + API (READY) → sample analysed through the proxy: 168 frames, 149 valid, coverage 0.887.
+- API boots without the vision extra (LIMITED) — checked by import with numpy/mediapipe blocked; CI smoke now runs both modes.
+- Playwright desktop + iPhone 13: sample → live progress → skeleton overlay → debugger; two-dancer upload → honest failure.
+
 ## Verified claims — session 2 (2026-11-25)
 
 - `cd backend && uv run pytest` → 111 passed; ruff check/format + mypy strict clean.
@@ -73,13 +104,14 @@ States: planned → implemented → tested → deployed. On schedule (Nov 25 tar
 
 ## Known gaps / unverified
 
-- `/api/health` checks MediaPipe is *installed*, not that its native libs *load*; a missing `libEGL` is only caught by
-  `python -m app.pose.verify` (CI caught exactly this). Add a cached runtime self-test with Outcome 2.
+- Smoothing parameters and gate thresholds (55%/85% coverage, 20% multi-person, 0.5 visibility) are spec defaults checked
+  on 2 clips + variants only; recalibrate with more fixtures (Outcome 7).
+- Joint angles are 2-D (image plane); world landmarks are stored but not yet used. Yaw is experimental and labelled so.
+- Library cards don't show the new poster thumbnail yet (Outcome 3 thumbnails).
 - No rate limiting yet (Outcome 10).
 - Next's proxy buffers upload bodies in memory (limit raised to MAX_UPLOAD_MB+1). Fine for one user in dev/Codespaces;
   production should send uploads straight to the API or to signed storage uploads (Outcome 10/11).
-- Library cards show the clip's real aspect ratio, not a thumbnail (thumbnails come with the canonical transcode, Outcome 2).
-- Originals in codecs browsers can't play (e.g. HEVC .mov) show a "can't play the original" message until Outcome 2's playback copy.
+- Originals in codecs browsers can't play (e.g. HEVC .mov) play from the canonical copy once analysed; before analysis they show a message.
 - No full-body reference fixture yet (licence-verified). Best lead without a verifiable licence is recorded in docs/SOURCING.md.
 - SQLite returns naive timestamps (UTC by convention); Postgres keeps tz.
 
@@ -89,11 +121,14 @@ _None. The owner only tests. Sessions source every asset themselves (see `docs/S
 ## How Bhargav can test right now
 
 The one-click Codespaces path lands on Dec 3. Until then:
-1. Open the repo's **Actions** tab: the latest **CI** run is green (backend, frontend, smoke) — verified for 30816b5.
-2. Optional, on a machine with Node 20+, [uv](https://docs.astral.sh/uv/) and ffmpeg: `scripts/setup.sh && scripts/dev.sh`, then
-   - http://localhost:3000/studio?demo=1 → **Use this sample** → the dance page plays the clip privately;
-   - http://localhost:3000/studio → drop any MP4/MOV/WebM → preview → **Upload to studio**; try a .txt or an audio file to see the rejections;
-   - delete a dance from its card or page. The pill says LIMITED and **Analyze Choreography** is disabled — expected until Outcome 2.
+1. Open the repo's **Actions** tab: the latest **CI** run is green (backend incl. real-footage analysis tests, frontend, smoke
+   which analyses the sample end to end on a READY server and checks LIMITED mode without the vision stack).
+2. Optional, on a machine with Node 20+, [uv](https://docs.astral.sh/uv/) and ffmpeg (Linux also: `libegl1 libgles2 libgl1`):
+   `scripts/setup.sh && scripts/dev.sh`, then
+   - http://localhost:3000/studio?demo=1 → **Use this sample** → watch the progress ring (~10 s) → the skeleton tracks the
+     dancer on the video → **Open pose debugger** → step frames with ← / →, toggle IDs, click landmarks;
+   - upload your own MP4/MOV/WebM at http://localhost:3000/studio → **Analyze Choreography**. A clip with two people, or one
+     where you leave the frame for most of it, should stop with a clear explanation instead of a result.
 
 ## Owner testing path (target)
 - **GitHub Codespaces:** repo page → Code → Codespaces → Create. The devcontainer installs everything, downloads the model, seeds the demo, and starts the app on a forwarded HTTPS URL (webcam works).

@@ -2,15 +2,21 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ApiError, deleteProject, getProject, getSourceMedia, mediaHref, startAnalysis } from "@/lib/api";
+import { ApiError, deleteProject, getMedia, getPoses, getProject, mediaHref, startAnalysis } from "@/lib/api";
 import { formatBytes, formatDuration, warningLabel } from "@/lib/media";
-import type { Project } from "@/lib/types";
+import type { PosesResponse, Project } from "@/lib/types";
+
+import { AnalysisFailure, AnalysisProgress, TrackingSummary } from "./analysis-status";
+import { SkeletonOverlay } from "./skeleton-overlay";
 
 import { StatusChip } from "./project-list";
 import { Panel } from "./studio-shell";
 import { useStudioStatus } from "./studio-status";
+
+const RETRYABLE = new Set(["interrupted", "analysis_crashed", "analysis_unavailable", "decode_failed"]);
+const isBusy = (p: Project) => p.status === "queued" || p.status === "processing";
 
 type Load = { kind: "pending" } | { kind: "ok"; project: Project } | { kind: "missing" } | { kind: "error"; message: string };
 
@@ -25,16 +31,68 @@ export function ProjectView() {
   const [analysisMsg, setAnalysisMsg] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [poses, setPoses] = useState<PosesResponse | null>(null);
+  const [showSkeleton, setShowSkeleton] = useState(true);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  const fetchMedia = useCallback(async () => {
-    try {
-      const m = await getSourceMedia(id);
-      setSrc(mediaHref(m.url));
-      setVideoError(false);
-    } catch {
-      setSrc(null);
-    }
-  }, [id]);
+  const project = load.kind === "ok" ? load.project : null;
+  const analyzed = project?.status === "analyzed";
+  const hasCanonical = Boolean(project?.reference?.has_canonical);
+  const busy = project ? isBusy(project) : false;
+
+  const fetchMedia = useCallback(
+    async (kind: "source" | "canonical") => {
+      try {
+        const m = await getMedia(id, kind);
+        setSrc(mediaHref(m.url));
+        setVideoError(false);
+      } catch {
+        setSrc(null);
+      }
+    },
+    [id],
+  );
+
+  // Prefer the canonical copy (plays everywhere, matches the analysed timeline).
+  const projectId = project?.id;
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    getMedia(id, hasCanonical ? "canonical" : "source")
+      .then((m) => {
+        if (cancelled) return;
+        setSrc(mediaHref(m.url));
+        setVideoError(false);
+      })
+      .catch(() => !cancelled && setSrc(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [id, projectId, hasCanonical]);
+
+  useEffect(() => {
+    if (!analyzed && project?.status !== "failed") return;
+    if (!project?.reference?.analyzed_at) return;
+    let cancelled = false;
+    getPoses(id)
+      .then((p) => !cancelled && setPoses(p))
+      .catch(() => !cancelled && setPoses(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [id, analyzed, project?.status, project?.reference?.analyzed_at]);
+
+  // Poll while a job is queued/running; state lives on the server, so refresh/leave is safe.
+  useEffect(() => {
+    if (!busy) return;
+    const timer = window.setInterval(() => {
+      getProject(id)
+        .then((p) => setLoad({ kind: "ok", project: p }))
+        .catch(() => {});
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [id, busy]);
 
   useEffect(() => {
     if (!reachable) return;
@@ -43,7 +101,6 @@ export function ProjectView() {
       .then((project) => {
         if (cancelled) return;
         setLoad({ kind: "ok", project });
-        void fetchMedia();
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -53,7 +110,7 @@ export function ProjectView() {
     return () => {
       cancelled = true;
     };
-  }, [id, reachable, fetchMedia]);
+  }, [id, reachable]);
 
   if (view.state === "OFFLINE") {
     return (
@@ -90,41 +147,65 @@ export function ProjectView() {
     );
   }
 
-  const { project } = load;
-  const ref = project.reference;
-  const job = project.latest_job;
+  const p = load.project;
+  const ref = p.reference;
+  const job = p.latest_job;
   const analysisOff = view.state !== "READY";
+  const canStart =
+    p.status === "uploaded" || (p.status === "failed" && (job?.retryable || RETRYABLE.has(p.error_code ?? "")));
+  const overlay = analyzed && poses && hasCanonical && showSkeleton && src && !videoError;
+
+  const start = async () => {
+    setStarting(true);
+    setAnalysisMsg(null);
+    try {
+      await startAnalysis(p.id);
+      setLoad({ kind: "ok", project: await getProject(p.id) });
+    } catch (err) {
+      setAnalysisMsg(err instanceof Error ? err.message : "Analysis failed to start.");
+    } finally {
+      setStarting(false);
+    }
+  };
 
   return (
     <Wrap>
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <StatusChip status={project.status} />
-        {project.is_demo && (
+        <StatusChip status={p.status} />
+        {p.is_demo && (
           <span className="rounded-full bg-lime/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-lime">
             Sample clip · Mixkit Free License
           </span>
         )}
       </div>
-      <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-5xl">{project.title}</h1>
+      <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-5xl">{p.title}</h1>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="overflow-hidden rounded-3xl border border-line bg-black">
+        <div className="relative self-start overflow-hidden rounded-3xl border border-line bg-black">
           {src && !videoError ? (
-            <video
-              key={src}
-              src={src}
-              controls
-              playsInline
-              preload="metadata"
-              className="aspect-video max-h-[70vh] w-full bg-black object-contain"
-              onError={() => setVideoError(true)}
-            />
+            <div className="relative aspect-video max-h-[70vh] w-full">
+              <video
+                ref={videoRef}
+                key={src}
+                src={src}
+                controls
+                playsInline
+                preload="metadata"
+                className="absolute inset-0 h-full w-full bg-black object-contain"
+                onError={() => setVideoError(true)}
+              />
+              {overlay && <SkeletonOverlay videoRef={videoRef} poses={poses} />}
+            </div>
           ) : (
             <div className="flex aspect-video flex-col items-center justify-center gap-3 p-6 text-center text-muted">
               {videoError ? (
                 <>
                   <p>This browser can&apos;t play the original file. A playback copy is made during analysis.</p>
-                  <button type="button" onClick={fetchMedia} className="rounded-full border border-line px-4 py-2 text-sm text-ink">
+                  <button
+                    type="button"
+                    onClick={() => fetchMedia(hasCanonical ? "canonical" : "source")}
+                    className="rounded-full border border-line px-4 py-2 text-sm text-ink"
+                  >
                     Reload video
                   </button>
                 </>
@@ -157,36 +238,64 @@ export function ProjectView() {
             </ul>
           )}
 
-          {job && (
-            <div className="rounded-2xl border border-line bg-raised/60 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Last step</p>
-              <p className="mt-1 text-sm text-ink">{job.message ?? job.status}</p>
+          <AnalysisProgress project={p} />
+          <AnalysisFailure project={p} />
+          {analyzed && <TrackingSummary project={p} />}
+
+          {analyzed ? (
+            <div className="flex flex-col gap-3">
+              {poses && (
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3 text-sm">
+                  <span>Show measured skeleton</span>
+                  <input
+                    type="checkbox"
+                    checked={showSkeleton}
+                    onChange={(e) => setShowSkeleton(e.target.checked)}
+                    className="size-5 accent-[var(--color-lime)]"
+                  />
+                </label>
+              )}
+              <Link
+                href={`/studio/projects/${p.id}/debug`}
+                className="inline-flex h-14 w-full items-center justify-center rounded-full bg-lime px-6 font-display text-sm font-semibold uppercase tracking-[0.12em] text-studio transition hover:-translate-y-0.5"
+              >
+                Open pose debugger
+              </Link>
+              <p className="text-sm text-muted">
+                Every joint, angle and confidence value measured from this video. Sections and Learn Mode come next.
+              </p>
+            </div>
+          ) : busy ? null : p.status === "failed" && !canStart ? (
+            <Link
+              href="/studio"
+              className="inline-flex h-14 w-full items-center justify-center rounded-full border border-lime/60 px-6 font-display text-sm font-semibold uppercase tracking-[0.12em] text-lime transition hover:-translate-y-0.5"
+            >
+              Upload a different video
+            </Link>
+          ) : (
+            <div>
+              <button
+                type="button"
+                disabled={analysisOff || starting}
+                aria-describedby="analysis-note"
+                onClick={start}
+                className="inline-flex h-14 w-full items-center justify-center rounded-full bg-lime px-6 font-display text-sm font-semibold uppercase tracking-[0.12em] text-studio transition enabled:hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-raised-2 disabled:text-muted"
+              >
+                {starting ? "Starting…" : p.status === "failed" ? "Try analysis again" : "Analyze Choreography"}
+              </button>
+              <p id="analysis-note" className="mt-3 text-sm text-muted" role="status">
+                {analysisMsg ??
+                  (analysisOff
+                    ? `Analysis is off in Limited mode${view.detail ? `: ${view.detail}` : ""}. We won't show made-up results.`
+                    : "Finds the dancer's pose in every frame (about 10–30 seconds for a short clip).")}
+              </p>
             </div>
           )}
-
-          <div>
-            <button
-              type="button"
-              disabled={analysisOff}
-              aria-describedby="analysis-note"
-              onClick={async () => {
-                try {
-                  await startAnalysis(project.id);
-                } catch (err) {
-                  setAnalysisMsg(err instanceof Error ? err.message : "Analysis failed to start.");
-                }
-              }}
-              className="inline-flex h-14 w-full items-center justify-center rounded-full bg-lime px-6 font-display text-sm font-semibold uppercase tracking-[0.12em] text-studio transition enabled:hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-raised-2 disabled:text-muted"
-            >
-              Analyze Choreography
-            </button>
-            <p id="analysis-note" className="mt-3 text-sm text-muted" role="status">
-              {analysisMsg ??
-                (analysisOff
-                  ? "Analysis is off in Limited mode: the pose pipeline isn't live yet, and we won't show made-up results."
-                  : "Finds the dancer's pose in every frame and suggests sections.")}
-            </p>
-          </div>
+          {p.status === "failed" && poses && (
+            <Link href={`/studio/projects/${p.id}/debug`} className="text-sm text-lime underline-offset-4 hover:underline">
+              Inspect what the tracker saw →
+            </Link>
+          )}
 
           <div className="mt-auto border-t border-line/70 pt-5">
             {confirmDelete ? (
@@ -201,7 +310,7 @@ export function ProjectView() {
                   onClick={async () => {
                     setDeleting(true);
                     try {
-                      await deleteProject(project.id);
+                      await deleteProject(p.id);
                       router.push("/studio");
                     } catch {
                       setDeleting(false);

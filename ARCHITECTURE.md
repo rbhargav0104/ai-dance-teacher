@@ -28,12 +28,19 @@ Browser ──/api/*──▶ Next.js (frontend, :3000) ──rewrite──▶ F
   enter the database.
 - **Pose runtime** — `app/pose/runtime.py` reports model presence, SHA-256 verification and MediaPipe
   availability. `/api/health` is READY only when those *and* the analysis pipeline exist.
-  `python -m app.pose.verify` loads the real model and runs a VIDEO-mode inference.
+  `python -m app.pose.verify` loads the real model and runs a VIDEO-mode inference; `/api/health` runs a cached
+  self-test of the same load so missing native libs show as LIMITED.
+- **Reference analysis (Outcome 2)** — `app/pipeline/reference.py`: source → `media/transcode.py` canonical copy
+  (24 fps H.264 ≤1280 px) + poster → `pose/extract.py` (FFmpeg decodes at 12 fps, MediaPipe VIDEO mode, up to 2
+  poses) → `pose/quality.select_track` (one dancer, no silent identity switch) → `pose/features.py` (One-Euro
+  smoothing, aspect correction, hip-root/torso-scale normalization, angles, travel, velocity, labelled estimates)
+  → `pose/quality.assess` (coverage / multi-person / cropped-body gates) → one `reference_pose_frames` row per
+  analysed frame. Failed gates still store frames so the debugger can show *why*.
+- **Jobs** — `app/jobs/queue.py` (idempotent enqueue, conditional-UPDATE claim, heartbeat lease, recovery with
+  max attempts, stuck-project repair) and `app/jobs/worker.py` (in-process thread when `WORKER_MODE=thread`).
 
 ## Planned (by outcome)
 
-- Outcome 1: streaming upload + FFprobe validation + no-residue cleanup, project list/delete, job records.
-- Outcome 2: canonical transcode (FFmpeg), real pose extraction, quality gates, skeleton debugger.
 - Outcomes 3–9: segmentation, Teacher Mode, learner capture, normalization + bounded DTW, versioned scoring,
   feedback, report/dashboard — pure math in isolated `app/<domain>` modules with deterministic unit tests.
 - Outcome 10: Postgres + durable worker (`FOR UPDATE SKIP LOCKED`), Supabase auth/storage adapters, rate limits.
@@ -41,5 +48,6 @@ Browser ──/api/*──▶ Next.js (frontend, :3000) ──rewrite──▶ F
 
 ## Development job model
 
-Development runs **one** API process. The durable worker and job claiming arrive with Outcome 1–2 (in-process,
-SQLite) and Outcome 10 (Postgres row locking).
+Development runs **one** API process with the worker as a background thread (SQLite). Claims are conditional
+UPDATEs, so even two processes can't run the same job; Outcome 10 adds a dedicated worker process and Postgres
+`FOR UPDATE SKIP LOCKED`.

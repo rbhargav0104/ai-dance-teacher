@@ -58,6 +58,10 @@ const WARNINGS: Record<string, string> = {
   low_frame_rate: "Low frame rate — fast moves may blur",
   low_resolution: "Low resolution — tracking may be less reliable",
   may_need_conversion_for_playback: "May need conversion before it plays in every browser",
+  partial_coverage: "Part of the video couldn't be tracked — those moments are left out",
+  cropped_body: "Feet are out of frame — leg and footwork detail is limited",
+  low_tracking_confidence: "Tracking confidence is low — joint measurements may be noisy",
+  brief_extra_person: "Another person appears briefly — we followed the main dancer",
 };
 
 export const warningLabel = (code: string) => WARNINGS[code] ?? code.replaceAll("_", " ");
@@ -67,8 +71,12 @@ export function projectStatusLabel(status: string): { label: string; tone: "lime
   switch (status) {
     case "uploaded":
       return { label: "Checked · waiting for analysis", tone: "muted" };
+    case "queued":
+      return { label: "Queued for analysis", tone: "amber" };
     case "processing":
       return { label: "Analyzing", tone: "amber" };
+    case "analyzed":
+      return { label: "Pose tracked", tone: "lime" };
     case "ready":
       return { label: "Ready to learn", tone: "lime" };
     case "failed":

@@ -54,8 +54,8 @@ npm test && npm run lint && npm run typecheck && npm run build
 
 | State | Meaning |
 |---|---|
-| **STUDIO READY** | API, database, private storage, verified pose model, runtime and analysis pipeline all available |
-| **LIMITED** | Private studio works, but movement analysis is unavailable (model missing/corrupt, runtime absent, or pipeline not built yet). Analysis is refused server-side, not faked |
+| **STUDIO READY** | API, database, private storage, verified pose model that actually loads (self-test), FFmpeg and the analysis worker all available |
+| **LIMITED** | Private studio works, but movement analysis is unavailable (model missing/corrupt, runtime or native libs absent, worker off). Analysis is refused server-side, not faked |
 | **OFFLINE** | The API can't be reached or persistence is broken. Retry is offered |
 
 ## Layout
