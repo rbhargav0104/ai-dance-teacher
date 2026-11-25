@@ -81,3 +81,7 @@ Still no licence-verified full-body clip (feet) — both references are cropped;
 Next (Nov 26, Outcome 3): automatic section boundaries from motion energy/pauses/pose change, thumbnails (poster per section),
 editable timeline (split/merge/drag, persisted, full coverage without gaps/overlap), section loop/speed/mirror playback,
 experimental instructions from measured features only. Also library-card poster thumbnails; another full-body fixture search.
+- CI run 6 (96b3be6) and run 7 (de45e83) → **green**. Run 7 smoke: READY → sample analysed through the proxy in ~6 s
+  (168 frames, 147 valid, coverage 0.875); then LIMITED without the vision stack → analysis refused with 503.
+  Note: coverage differs slightly between machines (0.887 here vs 0.875 on the runner — MediaPipe/CPU float differences);
+  tests assert ranges, not exact values.
