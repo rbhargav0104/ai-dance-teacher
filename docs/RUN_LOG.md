@@ -85,3 +85,9 @@ experimental instructions from measured features only. Also library-card poster 
   (168 frames, 147 valid, coverage 0.875); then LIMITED without the vision stack → analysis refused with 503.
   Note: coverage differs slightly between machines (0.887 here vs 0.875 on the runner — MediaPipe/CPU float differences);
   tests assert ranges, not exact values.
+
+## 2026-11-25 ~15:30 IST — owner feedback (live, same session)
+- Owner saw screenshots and said an **AI avatar should come and teach** after uploading. Asked to choose, he picked a
+  **full 3D avatar** and **spoken cues**. Recorded as spec amendment A1 (docs/SPEC_AMENDMENTS.md), DECISIONS.md entry,
+  re-paced IMPLEMENTATION_PLAN.md (avatar = Outcome 4, Nov 27–28), CLAUDE.md now points sessions at the amendment.
+- No code changed for this yet. Next session (Nov 26 01:43): Outcome 3 sections + avatar retargeting maths with unit tests.

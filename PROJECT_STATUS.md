@@ -10,7 +10,7 @@ _Last updated: 2026-11-25 ~15:00 IST (build session 3)_
 | 1 | Robust private reference intake | **tested** | Exit gate met (see below). Gap: no licence-verified *full-body* reference clip found yet — both committed samples crop the dancer above the knees. |
 | 2 | Real reference pose + debugger | **tested** | Exit gate met (evidence below). Delivered a session early. Postgres `SKIP LOCKED` claiming deferred to Outcome 10 as planned. |
 | 3 | Teachable sections | planned | |
-| 4 | Teacher Mode | planned | |
+| 4 | Teacher Mode — **3D AI avatar teacher with voice** | planned | Scope changed by the owner on Nov 25 (docs/SPEC_AMENDMENTS.md A1). Target Nov 27–28. |
 | 5 | Learner capture + real learner pose | planned | |
 | 6 | Normalized alignment | planned | |
 | 7 | Versioned scoring | planned | |
@@ -103,6 +103,10 @@ States: planned → implemented → tested → deployed. Ahead of schedule (Nov 
 - Server reports **LIMITED** (honestly): model verified + runtime installed, but the analysis pipeline isn't built yet.
 
 ## Known gaps / unverified
+
+- Not built yet: the 3D avatar teacher (Outcome 4, owner amendment A1). Today a dance page shows the video with a
+  skeleton overlay and a developer debugger. Those are analysis views, not the teaching experience.
+- Library cards show an empty placeholder instead of the poster frame; studio sample copy still says "once analysis is on".
 
 - Smoothing parameters and gate thresholds (55%/85% coverage, 20% multi-person, 0.5 visibility) are spec defaults checked
   on 2 clips + variants only; recalibrate with more fixtures (Outcome 7).
