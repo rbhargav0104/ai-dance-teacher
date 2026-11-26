@@ -94,7 +94,7 @@ class IntakeRequest:
     is_demo: bool = False
 
 
-def _warnings(probe: ProbeResult) -> list[str]:
+def intake_warnings(probe: ProbeResult) -> list[str]:
     warnings: list[str] = []
     if probe.display_height > probe.display_width:
         warnings.append("portrait")
@@ -131,7 +131,7 @@ def persist_reference(db: Session, storage: ObjectStorage, req: IntakeRequest) -
             source_fps=req.probe.fps,
             width=req.probe.display_width,
             height=req.probe.display_height,
-            warnings=_warnings(req.probe),
+            warnings=intake_warnings(req.probe),
             source_size_bytes=stored,
             source_codec=req.probe.video_codec[:32],
             source_container=req.probe.format_name[:64],

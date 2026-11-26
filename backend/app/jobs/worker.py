@@ -18,9 +18,10 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.db.session import get_sessionmaker
 from app.jobs import queue
-from app.models import AnalysisJob, DanceProject
+from app.models import AnalysisJob, DanceProject, PracticeSession
 from app.pipeline.errors import AnalysisFailed
 from app.services.intake import project_prefix
+from app.services.practice import practice_prefix
 from app.storage import get_storage
 
 log = logging.getLogger("app.worker")
@@ -91,6 +92,7 @@ class Worker:
             if job is None:
                 return
             project_id = job.project_id
+            practice_id = job.practice_session_id
             owner_id = job.owner_id
             attempts = job.attempts
 
@@ -100,19 +102,27 @@ class Worker:
 
             log.info("job_started", extra={"job_id": job_id, "attempt": attempts})
             try:
-                if job.kind != queue.REFERENCE_ANALYSIS:
+                if job.kind not in (queue.REFERENCE_ANALYSIS, queue.PRACTICE_ANALYSIS):
                     raise AnalysisFailed("unknown_job", "Unknown job type.")
                 try:
-                    from app.pipeline.reference import run_reference_analysis
+                    if job.kind == queue.PRACTICE_ANALYSIS:
+                        from app.pipeline.practice import run_practice_analysis
+
+                        res = run_practice_analysis(db, storage, self.settings, job, progress)
+                        warnings, frames = res.warnings, res.frames
+                    else:
+                        from app.pipeline.reference import run_reference_analysis
+
+                        out = run_reference_analysis(db, storage, self.settings, job, progress)
+                        warnings, frames = out.warnings, out.frames
                 except ImportError as exc:
                     raise AnalysisFailed(
                         "analysis_unavailable",
                         "The movement-analysis runtime is not installed on this server.",
                         retryable=True,
                     ) from exc
-                outcome = run_reference_analysis(db, storage, self.settings, job, progress)
                 note = "Analysis complete."
-                if outcome.warnings:
+                if warnings:
                     note = "Analysis complete with warnings."
                 queue.finish(
                     db,
@@ -122,19 +132,19 @@ class Worker:
                     message=note,
                     project_status="analyzed",
                 )
-                log.info("job_succeeded", extra={"job_id": job_id, "frames": outcome.frames})
+                log.info("job_succeeded", extra={"job_id": job_id, "frames": frames})
             except queue.JobLost:
                 db.rollback()
-                self._cleanup_if_deleted(project_id, owner_id)
+                self._cleanup_if_deleted(project_id, owner_id, practice_id)
                 log.info("job_lost", extra={"job_id": job_id})
             except AnalysisFailed as exc:
                 db.rollback()
                 self._safe_finish_failed(db, job_id, exc.code, exc.message, exc.retryable)
-                self._cleanup_if_deleted(project_id, owner_id)
+                self._cleanup_if_deleted(project_id, owner_id, practice_id)
             except Exception:
                 db.rollback()
                 log.exception("job_crashed", extra={"job_id": job_id})
-                if self._cleanup_if_deleted(project_id, owner_id):
+                if self._cleanup_if_deleted(project_id, owner_id, practice_id):
                     return
                 if attempts < self.settings.job_max_attempts:
                     queue.requeue(db, job_id, self.worker_id, "Retrying after an internal error…")
@@ -166,15 +176,24 @@ class Worker:
         except queue.JobLost:
             pass
 
-    def _cleanup_if_deleted(self, project_id: str | None, owner_id: str) -> bool:
-        """If the project was deleted mid-job, remove anything the job wrote after deletion."""
+    def _cleanup_if_deleted(
+        self, project_id: str | None, owner_id: str, practice_id: str | None = None
+    ) -> bool:
+        """If the dance (or attempt) was deleted mid-job, remove anything the job wrote after."""
         if project_id is None:
             return False
         with get_sessionmaker()() as db:
-            if db.get(DanceProject, project_id) is not None:
-                return False
-        get_storage().delete_prefix(project_prefix(owner_id, project_id))
-        return True
+            project_exists = db.get(DanceProject, project_id) is not None
+            practice_exists = (
+                practice_id is None or db.get(PracticeSession, practice_id) is not None
+            )
+        if not project_exists:
+            get_storage().delete_prefix(project_prefix(owner_id, project_id))
+            return True
+        if not practice_exists and practice_id is not None:
+            get_storage().delete_prefix(practice_prefix(owner_id, project_id, practice_id))
+            return True
+        return False
 
 
 _worker: Worker | None = None

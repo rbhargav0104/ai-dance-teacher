@@ -88,3 +88,8 @@ Each variant's expected relationship goes in `fixture_manifest.json` (spec secti
 ## Webcam path without a human
 Playwright Chromium flags `--use-fake-ui-for-media-stream --use-fake-device-for-media-stream --use-file-for-fake-video-capture=<fixture>.y4m`
 let E2E tests exercise the real MediaRecorder flow with a fixture video as the camera.
+Implemented in `scripts/e2e/practice.cjs` (fake camera = `fixtures/attempts/girl_good.mp4` → .y4m at runtime, not committed).
+A denied permission is simulated with `--use-fake-ui-for-media-stream=deny` (plain headless returns `NotSupportedError`).
+
+## Learner-attempt fixtures — status (2026-11-27)
+Generated and committed: `fixtures/attempts/` (9 variants, 3.1 MB) by `scripts/make_attempt_fixtures.py`; see the manifest.

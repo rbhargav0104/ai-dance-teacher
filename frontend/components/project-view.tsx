@@ -212,6 +212,13 @@ export function ProjectView() {
                 </label>
               )}
               <Link
+                href={`/studio/projects/${p.id}/practice`}
+                data-testid="practice-full"
+                className="inline-flex h-12 w-full items-center justify-center rounded-full bg-lime px-6 font-display text-xs font-semibold uppercase tracking-[0.12em] text-studio transition hover:-translate-y-0.5"
+              >
+                Practise &amp; review attempts
+              </Link>
+              <Link
                 href={`/studio/projects/${p.id}/debug`}
                 className="inline-flex h-12 w-full items-center justify-center rounded-full border border-line px-6 font-display text-xs font-semibold uppercase tracking-[0.12em] text-ink transition hover:-translate-y-0.5 hover:border-lime/60"
               >

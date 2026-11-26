@@ -5,6 +5,9 @@ import type {
   MediaKind,
   MediaUrl,
   MeResponse,
+  CaptureSource,
+  PracticeList,
+  PracticeSession,
   Project,
   ProjectList,
   PosesResponse,
@@ -180,16 +183,24 @@ export class UploadAborted extends Error {
   }
 }
 
-function xhrUpload(token: string, opts: UploadOptions, setXhr: (x: XMLHttpRequest) => void) {
+interface XhrRequest {
+  path: string;
+  fields: Record<string, string>;
+  file: File;
+  idempotencyKey: string;
+  onProgress?: (fraction: number) => void;
+}
+
+function xhrUpload(token: string, req: XhrRequest, setXhr: (x: XMLHttpRequest) => void) {
   return new Promise<{ status: number; body: unknown }>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     setXhr(xhr);
-    xhr.open("POST", `${API_BASE}/api/projects`);
+    xhr.open("POST", `${API_BASE}${req.path}`);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    xhr.setRequestHeader("Idempotency-Key", opts.idempotencyKey);
+    xhr.setRequestHeader("Idempotency-Key", req.idempotencyKey);
     xhr.responseType = "text";
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && e.total > 0) opts.onProgress?.(e.loaded / e.total);
+      if (e.lengthComputable && e.total > 0) req.onProgress?.(e.loaded / e.total);
     };
     xhr.onload = () => {
       let body: unknown = null;
@@ -203,14 +214,14 @@ function xhrUpload(token: string, opts: UploadOptions, setXhr: (x: XMLHttpReques
     xhr.onerror = () => reject(new NetworkError());
     xhr.onabort = () => reject(new UploadAborted());
     const form = new FormData();
-    if (opts.title) form.append("title", opts.title);
-    form.append("file", opts.file, opts.file.name);
+    for (const [k, v] of Object.entries(req.fields)) form.append(k, v);
+    form.append("file", req.file, req.file.name);
     xhr.send(form);
   });
 }
 
-function toProjectOrThrow(res: { status: number; body: unknown }): Project {
-  if (res.status >= 200 && res.status < 300) return res.body as Project;
+function bodyOrThrow<T>(res: { status: number; body: unknown }): T {
+  if (res.status >= 200 && res.status < 300) return res.body as T;
   const err = (res.body as ApiErrorBody | null)?.error;
   if (res.status === 413 && !err) {
     throw new ApiError(413, "file_too_large", "This video is larger than the server accepts.");
@@ -223,25 +234,25 @@ function toProjectOrThrow(res: { status: number; body: unknown }): Project {
 }
 
 /**
- * Upload a reference video with real byte progress. A 401 is always raised before anything is
+ * Multipart upload with real byte progress. A 401 is always raised before anything is
  * persisted, so it is safe to refresh the local session and retry exactly once (spec 25).
  * Network failures are surfaced, never auto-retried; a manual retry reuses the idempotency key.
  */
-export function uploadReference(opts: UploadOptions): UploadHandle {
+function upload<T>(req: XhrRequest): { promise: Promise<T>; abort: () => void } {
   let current: XMLHttpRequest | null = null;
   let aborted = false;
   const setXhr = (x: XMLHttpRequest) => {
     current = x;
   };
   const promise = (async () => {
-    let res = await xhrUpload(await ensureToken(), opts, setXhr);
+    let res = await xhrUpload(await ensureToken(), req, setXhr);
     if (res.status === 401 && !aborted) {
       memoryToken = null;
       writeToken(null);
-      opts.onProgress?.(0);
-      res = await xhrUpload(await createSession(), opts, setXhr);
+      req.onProgress?.(0);
+      res = await xhrUpload(await createSession(), req, setXhr);
     }
-    return toProjectOrThrow(res);
+    return bodyOrThrow<T>(res);
   })();
   return {
     promise,
@@ -251,6 +262,59 @@ export function uploadReference(opts: UploadOptions): UploadHandle {
     },
   };
 }
+
+/** Upload a reference video (new dance). */
+export function uploadReference(opts: UploadOptions): UploadHandle {
+  return upload<Project>({
+    path: "/api/projects",
+    fields: opts.title ? { title: opts.title } : {},
+    file: opts.file,
+    idempotencyKey: opts.idempotencyKey,
+    onProgress: opts.onProgress,
+  });
+}
+
+export interface PracticeUploadOptions {
+  projectId: string;
+  file: File;
+  segmentId: string | null;
+  captureSource: CaptureSource;
+  /** The video itself is a mirror image (e.g. exported from a selfie app). */
+  mirrored: boolean;
+  idempotencyKey: string;
+  onProgress?: (fraction: number) => void;
+}
+
+/** Upload a learner attempt (webcam recording or file). Analysis starts server-side. */
+export function uploadPractice(opts: PracticeUploadOptions): { promise: Promise<PracticeSession>; abort: () => void } {
+  const fields: Record<string, string> = {
+    capture_source: opts.captureSource,
+    mirrored: opts.mirrored ? "true" : "false",
+  };
+  if (opts.segmentId) fields.segment_id = opts.segmentId;
+  return upload<PracticeSession>({
+    path: `/api/projects/${encodeURIComponent(opts.projectId)}/practice-sessions`,
+    fields,
+    file: opts.file,
+    idempotencyKey: opts.idempotencyKey,
+    onProgress: opts.onProgress,
+  });
+}
+
+const practicePath = (id: string) => `/api/practice-sessions/${encodeURIComponent(id)}`;
+export const listPractice = (projectId: string) =>
+  authed<PracticeList>(`/api/projects/${encodeURIComponent(projectId)}/practice-sessions`);
+export const getPractice = (id: string) => authed<PracticeSession>(practicePath(id));
+export const deletePractice = (id: string) => authed<void>(practicePath(id), { method: "DELETE" });
+export const startPracticeAnalysis = (id: string, rerun = false) =>
+  authed<JobInfo>(`${practicePath(id)}/analysis`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rerun }),
+  });
+export const getPracticePoses = (id: string) => authed<PosesResponse>(`${practicePath(id)}/poses`);
+export const getPracticeMedia = (id: string, kind: MediaKind = "canonical") =>
+  authed<MediaUrl>(`${practicePath(id)}/media/${kind}`);
 
 /** Test hook. */
 export function __resetSessionForTests(): void {

@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ApiError, getSections, mediaHref, regenerateSections, saveSections, updateSection } from "@/lib/api";
@@ -585,6 +586,7 @@ export function LearnStudio({
             onComplete={markComplete}
             onPrev={() => select(active - 1)}
             onNext={() => select(active + 1)}
+            practiceHref={`/studio/projects/${projectId}/practice?section=${encodeURIComponent(current.id)}`}
           />
         )}
         {aside}
@@ -921,7 +923,9 @@ function SectionCard({
   onComplete,
   onPrev,
   onNext,
+  practiceHref,
 }: {
+  practiceHref: string;
   section: Section;
   total: number;
   instruction: string | null;
@@ -982,6 +986,14 @@ function SectionCard({
         >
           {section.completed ? "✓ Completed — undo" : "Mark complete"}
         </button>
+        <Link
+          href={practiceHref}
+          data-testid="practice-section"
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-lime/60 px-6 font-display text-xs font-semibold uppercase tracking-[0.12em] text-lime transition hover:-translate-y-0.5"
+        >
+          <span aria-hidden className="size-2 rounded-full bg-danger" />
+          Practise this section
+        </Link>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"

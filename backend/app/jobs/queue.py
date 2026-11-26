@@ -15,11 +15,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.base import utcnow
-from app.models import AnalysisJob, DanceProject
+from app.models import AnalysisJob, DanceProject, PracticeSession
 
 log = logging.getLogger("app.jobs")
 
 REFERENCE_ANALYSIS = "reference_analysis"
+PRACTICE_ANALYSIS = "practice_analysis"
 ACTIVE = ("queued", "running")
 
 # User-facing stage names (spec 24): inspecting, preparing, tracking, segmenting, comparing,
@@ -30,6 +31,12 @@ STAGE_MESSAGES = {
     "tracking": "Tracking the dancer's body frame by frame…",
     "saving": "Saving landmarks and measurements…",
     "segmenting": "Suggesting teachable sections…",
+}
+
+PRACTICE_STAGE_MESSAGES = {
+    **STAGE_MESSAGES,
+    "preparing": "Preparing a steady 24 fps copy of your attempt…",
+    "tracking": "Tracking your body frame by frame…",
 }
 
 
@@ -86,6 +93,81 @@ def enqueue_reference_analysis(db: Session, project: DanceProject) -> tuple[Anal
     return job, True
 
 
+def active_practice_job(db: Session, session_id: str) -> AnalysisJob | None:
+    return db.scalars(
+        select(AnalysisJob)
+        .where(
+            AnalysisJob.practice_session_id == session_id,
+            AnalysisJob.kind == PRACTICE_ANALYSIS,
+            AnalysisJob.status.in_(ACTIVE),
+        )
+        .order_by(AnalysisJob.created_at.desc())
+    ).first()
+
+
+def latest_practice_job(db: Session, session_id: str) -> AnalysisJob | None:
+    return db.scalars(
+        select(AnalysisJob)
+        .where(AnalysisJob.practice_session_id == session_id)
+        .order_by(AnalysisJob.created_at.desc(), AnalysisJob.id.desc())
+    ).first()
+
+
+def enqueue_practice_analysis(db: Session, practice: PracticeSession) -> tuple[AnalysisJob, bool]:
+    """Same contract as reference analysis: re-requests while active return the active job."""
+    existing = active_practice_job(db, practice.id)
+    if existing is not None:
+        return existing, False
+    n = db.scalar(
+        select(func.count())
+        .select_from(AnalysisJob)
+        .where(AnalysisJob.practice_session_id == practice.id)
+    )
+    job = AnalysisJob(
+        owner_id=practice.owner_id,
+        project_id=practice.project_id,
+        practice_session_id=practice.id,
+        kind=PRACTICE_ANALYSIS,
+        idempotency_key=f"practice:{practice.id}:{(n or 0) + 1}",
+        status="queued",
+        stage="queued",
+        progress=0.0,
+        message=PRACTICE_STAGE_MESSAGES["queued"],
+        attempts=0,
+    )
+    practice.status = "queued"
+    practice.progress = 0.0
+    practice.error_code = None
+    practice.error_message = None
+    db.add(job)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = active_practice_job(db, practice.id)
+        if existing is None:
+            raise
+        return existing, False
+    return job, True
+
+
+def _targets(db: Session, job_id: str) -> tuple[str | None, str | None]:
+    """(project_id to update, practice_session_id to update) for a job's status mirror.
+
+    A practice job updates its attempt, never the dance project's own status."""
+    row = db.execute(
+        select(AnalysisJob.project_id, AnalysisJob.practice_session_id).where(
+            AnalysisJob.id == job_id
+        )
+    ).first()
+    if row is None:
+        return None, None
+    project_id, practice_id = row
+    if practice_id:
+        return None, practice_id
+    return project_id, None
+
+
 def claim_next(db: Session, worker_id: str) -> str | None:
     candidates = db.scalars(
         select(AnalysisJob.id)
@@ -114,6 +196,11 @@ def claim_next(db: Session, worker_id: str) -> str | None:
     return None
 
 
+def _is_practice(db: Session, job_id: str) -> bool:
+    kind = db.scalar(select(AnalysisJob.kind).where(AnalysisJob.id == job_id))
+    return kind == PRACTICE_ANALYSIS
+
+
 def heartbeat(
     db: Session,
     job_id: str,
@@ -124,6 +211,7 @@ def heartbeat(
     message: str | None = None,
 ) -> None:
     now = utcnow()
+    messages = PRACTICE_STAGE_MESSAGES if _is_practice(db, job_id) else STAGE_MESSAGES
     res = db.execute(
         update(AnalysisJob)
         .where(
@@ -134,7 +222,7 @@ def heartbeat(
         .values(
             stage=stage,
             progress=round(progress, 4),
-            message=message or STAGE_MESSAGES.get(stage),
+            message=message or messages.get(stage),
             heartbeat_at=now,
             updated_at=now,
         )
@@ -142,11 +230,17 @@ def heartbeat(
     if res.rowcount != 1:
         db.rollback()
         raise JobLost(job_id)
-    project_id = db.scalar(select(AnalysisJob.project_id).where(AnalysisJob.id == job_id))
+    project_id, practice_id = _targets(db, job_id)
     if project_id:
         db.execute(
             update(DanceProject)
             .where(DanceProject.id == project_id)
+            .values(status="processing", progress=round(progress, 4), updated_at=now)
+        )
+    if practice_id:
+        db.execute(
+            update(PracticeSession)
+            .where(PracticeSession.id == practice_id)
             .values(status="processing", progress=round(progress, 4), updated_at=now)
         )
     db.commit()
@@ -185,11 +279,13 @@ def finish(
     if res.rowcount != 1:
         db.rollback()
         raise JobLost(job_id)
-    project_id = db.scalar(select(AnalysisJob.project_id).where(AnalysisJob.id == job_id))
-    if project_id and project_status:
+    project_id, practice_id = _targets(db, job_id)
+    target = DanceProject if project_id else PracticeSession if practice_id else None
+    target_id = project_id or practice_id
+    if target is not None and project_status:
         db.execute(
-            update(DanceProject)
-            .where(DanceProject.id == project_id)
+            update(target)
+            .where(target.id == target_id)
             .values(
                 status=project_status,
                 progress=1.0 if project_status == "analyzed" else 0.0,
@@ -224,7 +320,11 @@ def recover(db: Session, *, lease_seconds: float, max_attempts: int) -> int:
     repaired = 0
     for job in stale:
         repaired += 1
-        project = db.get(DanceProject, job.project_id) if job.project_id else None
+        project: DanceProject | PracticeSession | None
+        if job.practice_session_id:
+            project = db.get(PracticeSession, job.practice_session_id)
+        else:
+            project = db.get(DanceProject, job.project_id) if job.project_id else None
         if job.attempts >= max_attempts:
             job.status = "failed"
             job.error_code = "interrupted"
@@ -258,5 +358,15 @@ def recover(db: Session, *, lease_seconds: float, max_attempts: int) -> int:
             project.error_code = "interrupted"
             project.error_message = "Analysis stopped unexpectedly. You can try again."
             project.progress = 0.0
+    busy_practice = db.scalars(
+        select(PracticeSession).where(PracticeSession.status.in_(("queued", "processing")))
+    ).all()
+    for practice in busy_practice:
+        if active_practice_job(db, practice.id) is None:
+            repaired += 1
+            practice.status = "failed"
+            practice.error_code = "interrupted"
+            practice.error_message = "Analysis stopped unexpectedly. You can try again."
+            practice.progress = 0.0
     db.commit()
     return repaired

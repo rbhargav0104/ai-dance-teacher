@@ -153,3 +153,31 @@ skinned model) only after Outcomes 6–8.
   ghosted bones and the check asserts exactly those are never animated at every timestamp. Arm angles on CI matched local
   (girl median 1.5–1.9°, boy median 3.8–4.9°, max 27.6°).
 - CI run 45786324936 (b930a3b) → **green** (backend, frontend, smoke incl. Teacher Mode browser check in READY, then LIMITED smoke).
+
+## 2026-11-27 01:44–03:00 IST — build session 6 (Outcome 5: learner capture + real learner pose)
+Start: local `main` fast-forwarded to origin (f807212); `add_repo`/`register_repo_root` not offered, repo already cloned with
+push access. Outcome 4 gate re-checked: `scripts/setup.sh`, backend 169 passed, frontend 67 passed; teacher-mode.cjs re-run at the end.
+
+Delivered:
+- Backend: `pipeline/common.py` (shared prepare/measure/rows/quality; reference pipeline refactored onto it, unchanged
+  output), `pipeline/practice.py`, `services/practice.py`, `api/practice.py`, `media/repair.py` (MediaRecorder WebM duration
+  fix by stream copy), migration `0005` (attempt metadata), queue/worker support for `practice_analysis` jobs + recovery.
+- Fixtures: `scripts/make_attempt_fixtures.py` → `fixtures/attempts/` 9 real-footage variants + manifest relationships.
+- Frontend: `/studio/projects/[id]/practice` (`practice-studio.tsx`, `camera-recorder.tsx`), `/studio/practice/[sid]`
+  (`attempt-review.tsx` side-by-side), `lib/practice.ts`, API client (`uploadPractice` etc., shared XHR uploader), CTAs on
+  the section card and dance page.
+- `scripts/e2e/practice.cjs` + CI step (fake webcam from real footage).
+
+Commands and results:
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 184 passed (+15).
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 76 passed (+9).
+- `scripts/smoke.sh` (READY, built web) → SMOKE OK. `node scripts/e2e/practice.cjs` → PRACTICE CHECK OK (webcam attempt
+  65 frames / 53 valid / coverage 0.82; side-by-side drift 0.000 s; occluded upload → partial_coverage; denied → guidance).
+  `teacher-mode.cjs` → OK; `learn-mode.cjs` → OK.
+
+Found and fixed during the run: Chrome's MediaRecorder WebM has no duration (ffprobe rejected it) → stream-copy repair;
+attempt jobs would have flipped the dance to "processing" and become its `latest_job` → status mirroring targets the attempt;
+"mirrored preview" label overlapped the reference PiP on mobile; headless camera denial needs `--use-fake-ui-for-media-stream=deny`.
+
+Next (Nov 27 pm, Outcome 6): normalization (shoulder + hip scale, root), mirror handling/detection, bounded DTW keeping
+original timestamps, invariance tests on the attempt fixtures (scaled/translated, late, speed, mirrored).

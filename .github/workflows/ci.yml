@@ -106,6 +106,8 @@ jobs:
           mkdir -p /tmp/pw e2e-shots
           (cd /tmp/pw && npm init -y >/dev/null && npm install --no-audit --no-fund playwright@1.63.0 && npx playwright install --with-deps chromium)
           NODE_PATH=/tmp/pw/node_modules node scripts/e2e/teacher-mode.cjs e2e-shots
+      - name: Practice browser check (fake webcam fed real footage → real learner pose → side by side)
+        run: NODE_PATH=/tmp/pw/node_modules node scripts/e2e/practice.cjs e2e-shots/practice
       - name: Upload Teacher Mode screenshots
         if: always()
         uses: actions/upload-artifact@v4

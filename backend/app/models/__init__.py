@@ -177,7 +177,29 @@ class PracticeSession(Base):
     tracking_coverage: Mapped[float | None] = mapped_column(Float)
     declared_mirrored: Mapped[bool | None] = mapped_column(Boolean)
     detected_mirror_choice: Mapped[str | None] = mapped_column(String(16))
+    # Intake + analysis metadata (migration 0005).
+    capture_source: Mapped[str] = mapped_column(String(16), default="upload")
+    original_filename: Mapped[str | None] = mapped_column(String(255))
+    source_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    source_codec: Mapped[str | None] = mapped_column(String(32))
+    has_audio: Mapped[bool | None] = mapped_column(Boolean)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128))
+    canonical_width: Mapped[int | None] = mapped_column(Integer)
+    canonical_height: Mapped[int | None] = mapped_column(Integer)
+    canonical_fps: Mapped[float | None] = mapped_column(Float)
+    canonical_duration: Mapped[float | None] = mapped_column(Float)
+    analysis_fps: Mapped[float | None] = mapped_column(Float)
+    quality: Mapped[dict[str, Any] | None] = mapped_column(JsonType)
+    warnings: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    pipeline_version: Mapped[str | None] = mapped_column(String(64))
+    model_version: Mapped[str | None] = mapped_column(String(128))
+    analyzed_at: Mapped[datetime | None] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    updated_at: Mapped[datetime | None] = mapped_column(default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("owner_id", "idempotency_key", name="practice_owner_idempotency"),
+    )
 
 
 class UserPoseFrame(Base):

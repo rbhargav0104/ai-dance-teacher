@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-26 ~14:15 IST (build session 5)_
+_Last updated: 2026-11-27 ~03:00 IST (build session 6)_
 
 ## Outcomes
 
@@ -11,7 +11,7 @@ _Last updated: 2026-11-26 ~14:15 IST (build session 5)_
 | 2 | Real reference pose + debugger | **tested** | Exit gate met (evidence below). Delivered a session early. Postgres `SKIP LOCKED` claiming deferred to Outcome 10 as planned. |
 | 3 | Teachable sections | **tested** | Exit gate met (evidence below). Avatar retargeting maths started (`frontend/lib/avatar/retarget.ts`, unit-tested). |
 | 4 | Teacher Mode — **3D AI avatar teacher with voice** | **tested** | Exit gate (A1) met on desktop + iPhone 13 (evidence below), a day early. Unverified: real spoken audio (headless browsers have the API, not speakers) and GPU frame rate on real devices. Optional v2 skinned avatar not started. |
-| 5 | Learner capture + real learner pose | planned | |
+| 5 | Learner capture + real learner pose | **tested** | Exit gate met (evidence below), ~1.5 days ahead of plan. Real webcam path verified with Chromium's fake camera fed real footage; a human webcam + phone camera not tried yet. |
 | 6 | Normalized alignment | planned | |
 | 7 | Versioned scoring | planned | |
 | 8 | Actionable feedback | planned | |
@@ -19,7 +19,26 @@ _Last updated: 2026-11-26 ~14:15 IST (build session 5)_
 | 10 | Production identity + durable infra | planned | |
 | 11 | Stable deployment + full acceptance | planned | |
 
-States: planned → implemented → tested → deployed. Ahead of the revised plan: Outcome 4 done Nov 26 pm (planned Nov 27–28). Next: Outcome 5 learner capture.
+States: planned → implemented → tested → deployed. Ahead of the revised plan: Outcome 5 done Nov 27 am (planned Nov 28–29). Next: Outcome 6 normalized alignment.
+
+### Outcome 5 exit gate — evidence ("a learner attempt produces real stored pose data and can be reviewed beside the reference")
+- *Webcam → real stored pose*: `node scripts/e2e/practice.cjs` (also in CI) feeds Chromium's fake camera a real fixture
+  video, opens the dance → **Practise this section** → Turn on camera (mirrored preview) → Record → 3-2-1 → recording with
+  the reference section playing in the corner, elapsed clock → Stop → preview → Record again → Use this take. The attempt
+  (WebM, no container duration → stream-copy repair) is analysed by the real worker: 65 frames, 53 valid, coverage 0.82,
+  `learner-pose-1`, same model hash as the reference, linked to the section, stored unmirrored.
+- *Reviewed beside the reference*: side-by-side page plays the reference section and the attempt in step (drift 0.000 s
+  after 2 s of playback), measured skeletons on both, 0.5/0.75/1×, scrub, mirror; tracking stats + notes, "nothing on this
+  page is a score". Desktop 1440×900 and iPhone 13: no console errors, no horizontal overflow.
+- *Upload path + honest quality*: the real `girl_occluded` variant uploaded via the file picker → analysed, `partial_coverage`
+  shown. Camera permission denied → "Camera access is blocked" + upload fallback. Attempt delete from the list → 404.
+- *Same pipeline, same gates* (`tests/test_practice_analysis.py`, real MediaPipe on FFmpeg variants of real footage):
+  thresholds/smoothing/model identical to the reference; `girl_good` coverage within 0.08 of the reference; skeleton lands on
+  the learner's pixels; occluded 5–8 s frames invalid (≥ 80%) and coverage ≥ 0.15 lower; two dancers → `multiple_people`
+  (still inspectable); the dance's own status/latest job untouched by attempt jobs; delete while queued removes the job.
+- *API contract* (`tests/test_practice_api.py`, 13 tests): 409 before the dance is analysed; private 0600 storage, ranged
+  media; LIMITED stores but never analyses (503); idempotent retry; per-dance quota; owner isolation (same 404); 5 rejection
+  kinds + bad section + bad capture source leave no row/object/temp file; dance delete cascades attempts and media.
 
 ### Outcome 4 exit gate — evidence (docs/SPEC_AMENDMENTS.md A1)
 - *Learn a sample section by section from the 3D avatar, desktop + mobile*: `node scripts/e2e/teacher-mode.cjs` (also in CI)
@@ -74,6 +93,16 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 
 ## What exists today
 
+- **Practice (Outcome 5)**: from a section card (**Practise this section**) or the dance page (**Practise & review attempts**)
+  → `/studio/projects/{id}/practice`: pick Full dance or a section; **Record with camera** (setup tips, permission handling,
+  mirrored preview saved unmirrored, framing guide, 3-2-1, REC clock with auto-stop at target + 3 s, muted reference guide in
+  the corner, stop → preview → record again / use this take) or **Upload a video** (preview, "this video is mirrored").
+  Real byte-progress upload with safe retry. `/studio/practice/{id}`: live analysis progress, honest failures with
+  re-record, LIMITED "stored, not analysed", and once measured: reference + attempt side by side in step with skeletons,
+  tracking stats and notes; attempts list with delete. API: `POST/GET /api/projects/{id}/practice-sessions`,
+  `GET/DELETE /api/practice-sessions/{id}`, `POST …/analysis`, `GET …/poses`, `GET …/media/{source|canonical|poster}`.
+  No comparison or scoring yet (`scored: false`).
+
 - **Teacher Mode — 3D AI avatar (Outcome 4)**: an analysed dance opens on a studio stage where an original procedural
   mannequin performs the dancer's measured movement (MediaPipe world landmarks, One-Euro smoothed, fixed bone lengths).
   It follows the section player (loop, 0.25–1×, mirror by default), with the real video picture-in-picture (swap with
@@ -122,6 +151,13 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 - **CI** (`.github/workflows/ci.yml`): backend ruff + mypy strict + pytest (incl. real model load) + pose smoke;
   frontend eslint + tsc + vitest + build; end-to-end boot smoke.
 
+## Verified claims — session 6 (2026-11-27 am)
+
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 184 passed.
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 76 passed.
+- Built web + API (READY): `scripts/smoke.sh` → SMOKE OK; `node scripts/e2e/practice.cjs` → PRACTICE CHECK OK;
+  `teacher-mode.cjs` → OK (girl median 2.2°, boy max 27.9°); `learn-mode.cjs` → OK. Screenshots reviewed (desktop + iPhone 13).
+
 ## Verified claims — session 5 (2026-11-26 pm)
 
 - `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 67 passed.
@@ -167,6 +203,11 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 
 ## Known gaps / unverified
 
+- Practice: not yet tried with a human on a real laptop webcam or phone camera (Safari records MP4 — code path exists,
+  untested). Side-by-side is lined up from the start only; movement alignment, mirror detection, scores and feedback are
+  Outcomes 6–8. Upload goes through the Next proxy (buffers in memory, see below).
+- Torso scale measured 0.48× (not 0.6×) on the 60%-scaled variant (hips on the frame edge) — Outcome 6 normalization input.
+
 - Avatar: spoken audio not verified by a human ear yet (headless Chromium exposes speechSynthesis but has no speakers);
   real-device GPU frame rate not measured (headless SwiftShader software GL renders ~37 fps). Avatar stays hip-centred
   (no floor travel). Torso twist comes from the shoulder line only. Skinned v2 avatar not started (optional per A1).
@@ -192,8 +233,8 @@ _None. The owner only tests. Sessions source every asset themselves (see `docs/S
 ## How Bhargav can test right now
 
 The one-click Codespaces path lands on Dec 3. Until then:
-1. Open the repo's **Actions** tab → latest **CI** run (green for b930a3b). The *smoke* job now also runs the Teacher Mode browser check;
-   download the **teacher-mode-screenshots** artifact to see the avatar next to the video at fixed timestamps.
+1. Open the repo's **Actions** tab → latest **CI** run. The *smoke* job runs the Teacher Mode and Practice browser checks;
+   download the **teacher-mode-screenshots** artifact (practice screenshots are in its `practice/` folder).
 2. Optional, on a machine with Node 20+, [uv](https://docs.astral.sh/uv/) and ffmpeg (Linux also: `libegl1 libgles2 libgl1`):
    `scripts/setup.sh && scripts/dev.sh`, then
    - http://localhost:3000/studio?demo=1 → **Use this sample** → wait ~10 s for the analysis → the 3D avatar appears;
@@ -202,7 +243,10 @@ The one-click Codespaces path lands on Dec 3. Until then:
      orbit, **Video ⤢** to swap, **Voice** off; the legs are ghosted with a "not tracked in this video" label because the
      sample crops them;
    - **Mark complete** → **Next section**; **Edit sections** still lets you drag/split boundaries;
-   - on a phone (same Wi-Fi, http://<laptop-ip>:3000) the stage switches to a tall layout.
+   - on a phone (same Wi-Fi, http://<laptop-ip>:3000) the stage switches to a tall layout;
+   - **Practise this section** → Turn on camera → Record → dance along with the corner video → Stop → Use this take →
+     ~10 s later you and the reference play side by side with skeletons. (Camera needs localhost or https; on a phone over
+     plain http use **Upload a video** instead.)
 
 ## Owner testing path (target)
 - **GitHub Codespaces:** repo page → Code → Codespaces → Create. The devcontainer installs everything, downloads the model, seeds the demo, and starts the app on a forwarded HTTPS URL (webcam works).

@@ -127,7 +127,7 @@ class MediaUrl(BaseModel):
 def _latest_job(db: Session, project_id: str) -> AnalysisJob | None:
     return db.scalars(
         select(AnalysisJob)
-        .where(AnalysisJob.project_id == project_id)
+        .where(AnalysisJob.project_id == project_id, AnalysisJob.practice_session_id.is_(None))
         .order_by(AnalysisJob.created_at.desc(), AnalysisJob.id.desc())
     ).first()
 

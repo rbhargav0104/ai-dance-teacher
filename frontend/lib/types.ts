@@ -239,3 +239,55 @@ export interface SectionEdit {
   title?: string | null;
   completed?: boolean | null;
 }
+
+// Mirrors backend/app/api/practice.py.
+
+export type CaptureSource = "webcam" | "upload";
+
+export interface PracticeTarget {
+  segment_id: string | null;
+  title: string;
+  /** Reference-video seconds. */
+  start: number;
+  end: number;
+}
+
+export interface PracticeSession {
+  id: string;
+  project_id: string;
+  status: "uploaded" | "queued" | "processing" | "analyzed" | "failed" | string;
+  progress: number;
+  error_code: string | null;
+  error_message: string | null;
+  capture_source: CaptureSource;
+  declared_mirrored: boolean | null;
+  target: PracticeTarget;
+  original_filename: string | null;
+  duration: number | null;
+  width: number | null;
+  height: number | null;
+  source_fps: number | null;
+  size_bytes: number | null;
+  warnings: string[];
+  canonical_width: number | null;
+  canonical_height: number | null;
+  canonical_duration: number | null;
+  has_canonical: boolean;
+  has_poster: boolean;
+  analysis_fps: number | null;
+  tracking_coverage: number | null;
+  quality: QualityReport | null;
+  pipeline_version: string | null;
+  model_version: string | null;
+  analyzed_at: string | null;
+  created_at: string;
+  latest_job: JobInfo | null;
+  /** Always false until comparison + scoring exist (Outcomes 6–7). */
+  scored: boolean;
+}
+
+export interface PracticeList {
+  project_id: string;
+  sessions: PracticeSession[];
+  limit: number;
+}
