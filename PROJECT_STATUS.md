@@ -32,7 +32,8 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
   (36 bones). Boy sample: median 3.7–5.5°, max 27.9° (one fast forearm; smoothing + depth noise). Gate: median ≤ 8°, max ≤ 30°.
   Screenshots at those timestamps are uploaded as a CI artifact (`teacher-mode-screenshots`).
 - *Untracked limbs visibly marked, not animated*: both samples crop the legs → "Not tracked in this video: legs · shown
-  ghosted" and every leg bone reports `untracked` at every checked timestamp (rest pose, 16% opacity).
+  ghosted" (or "lower legs" when a thigh is tracked in most frames, as on the CI runner); every bone in the clip's
+  ghosted set reports `untracked` at every checked timestamp (rest pose, 16% opacity).
 - *Unit tests of the retargeting maths*: `tests/avatar-retarget.test.ts`, `avatar-track.test.ts` (One-Euro, gap bridging
   ≤ 2 frames, rare-limb ghosting, direction interpolation, fixed lengths, lost/outside, mirror side swap),
   `avatar-cues.test.ts` (perspective wording, caption timing, 8-count, count-in).

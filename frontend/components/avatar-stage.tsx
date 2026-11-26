@@ -41,6 +41,8 @@ export interface AvatarDebug {
   t: number;
   status: SampleStatus;
   mirrored: boolean;
+  /** Bones ghosted for the whole clip (labelled "not tracked in this video"). */
+  untracked: BoneName[];
   bones: Partial<Record<BoneName, { dir: [number, number, number]; state: BoneState }>>;
   frames: number;
 }
@@ -284,7 +286,7 @@ function Mannequin({
     }
     // Rest pose (never the last known pose) whenever the moment is unknown.
     const pose = !lost && sample.pose ? sample.pose : track.rest;
-    const debug: AvatarDebug = { t, status: sample.status, mirrored: track.mirrored, bones: {}, frames: ++frames.current };
+    const debug: AvatarDebug = { t, status: sample.status, mirrored: track.mirrored, untracked: rig.untracked, bones: {}, frames: ++frames.current };
 
     for (const def of BONES) {
       const bone = pose.bones[def.name];

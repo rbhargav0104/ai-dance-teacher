@@ -147,3 +147,8 @@ untracked label and the swap button covered the PiP dancer.
 Next (Nov 27, ahead of plan): Outcome 5 — learner capture (webcam with countdown + upload), real learner pose through the
 same pipeline, attempt fixtures generated with FFmpeg from real footage (docs/SOURCING.md). Avatar polish (travel, v2
 skinned model) only after Outcomes 6–8.
+- CI run 45784698428 (b018f05): frontend + backend green; smoke **red** on one Teacher Mode assertion: on the runner the boy
+  clip's left thigh was tracked in ≥ 50% of frames (CPU float differences), so the label correctly read "lower legs" while
+  my check demanded all four leg bones be unmeasured. Fixed the check (not the threshold): the stage now exposes the clip's
+  ghosted bones and the check asserts exactly those are never animated at every timestamp. Arm angles on CI matched local
+  (girl median 1.5–1.9°, boy median 3.8–4.9°, max 27.6°).

@@ -128,8 +128,12 @@ function measuredDir(frame, bone, mirrored) {
     await page.getByRole('button', { name: 'Mirror' }).click();
     await page.waitForFunction(() => window.__adtAvatar?.mirrored === false);
     results[id].direct = await armCheck(page, poses, TIMES.slice(0, 3), false, `s${k}-direct`);
-    const legStates = await page.evaluate(() => ['thighL', 'thighR', 'shinL', 'shinR'].map((b) => window.__adtAvatar.bones[b].state));
-    if (label) check(legStates.every((s) => s !== 'measured'), `s${k}: labelled-untracked legs are not animated (${legStates})`);
+    // Every bone the clip labels as untracked must be held (never "measured") at every checked time.
+    for (const t of TIMES) {
+      const d = await seekAndRead(page, t);
+      const animated = d.untracked.filter((b) => d.bones[b].state === 'measured');
+      check(!label || (d.untracked.length > 0 && animated.length === 0), `s${k} t=${t}: labelled-untracked bones [${d.untracked}] not animated${animated.length ? ' (animated: ' + animated + ')' : ''}`);
+    }
     await ctx.close();
   }
 
