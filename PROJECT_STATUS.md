@@ -157,6 +157,7 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 - `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 76 passed.
 - Built web + API (READY): `scripts/smoke.sh` → SMOKE OK; `node scripts/e2e/practice.cjs` → PRACTICE CHECK OK;
   `teacher-mode.cjs` → OK (girl median 2.2°, boy max 27.9°); `learn-mode.cjs` → OK. Screenshots reviewed (desktop + iPhone 13).
+- CI run 45898502567 (0f00636) → green, incl. the Practice browser check on the runner.
 
 ## Verified claims — session 5 (2026-11-26 pm)
 

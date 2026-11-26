@@ -192,3 +192,4 @@ original timestamps, invariance tests on the attempt fixtures (scaled/translated
   `videoWidth` was read before the fake camera's first frame on the runner (0x0). Everything else passed on CI (webcam
   attempt 64 frames / 47 valid / coverage 0.73, drift 0.000 s, mirrored upload, denied camera). The check now waits for
   the first frame.
+- CI run 45898502567 (0f00636) → **green** (backend, frontend, smoke incl. Teacher Mode + Practice browser checks in READY, then LIMITED smoke).
