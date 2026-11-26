@@ -30,8 +30,9 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 - *Reviewed beside the reference*: side-by-side page plays the reference section and the attempt in step (drift 0.000 s
   after 2 s of playback), measured skeletons on both, 0.5/0.75/1×, scrub, mirror; tracking stats + notes, "nothing on this
   page is a score". Desktop 1440×900 and iPhone 13: no console errors, no horizontal overflow.
-- *Upload path + honest quality*: the real `girl_occluded` variant uploaded via the file picker → analysed, `partial_coverage`
-  shown. Camera permission denied → "Camera access is blocked" + upload fallback. Attempt delete from the list → 404.
+- *Upload path + honest quality*: the real `girl_mirrored` variant uploaded via the file picker → analysed, cropped-legs
+  note shown. (The occluded variant lands either side of the 55% coverage gate depending on CPU: 0.73 locally, failed
+  `low_coverage` on the CI runner — both honest; the pytest asserts the masked frames in either case.) Camera permission denied → "Camera access is blocked" + upload fallback. Attempt delete from the list → 404.
 - *Same pipeline, same gates* (`tests/test_practice_analysis.py`, real MediaPipe on FFmpeg variants of real footage):
   thresholds/smoothing/model identical to the reference; `girl_good` coverage within 0.08 of the reference; skeleton lands on
   the learner's pixels; occluded 5–8 s frames invalid (≥ 80%) and coverage ≥ 0.15 lower; two dancers → `multiple_people`

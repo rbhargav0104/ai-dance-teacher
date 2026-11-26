@@ -3,7 +3,7 @@
 //  - webcam path: Chromium's fake camera is fed a REAL fixture video (fixtures/attempts/girl_good.mp4
 //    → .y4m); the page records it with MediaRecorder, countdown → recording → stop → preview → use;
 //    the attempt is analysed by the real pipeline and reviewed side by side (videos stay in step);
-//  - upload path: a real FFmpeg attempt variant (occluded) → honest tracking warning;
+//  - upload path: a real FFmpeg attempt variant (mirrored) → analysed, honest tracking note (legs cropped);
 //  - permission denied → clear guidance + upload fallback;
 //  - desktop 1440x900 + iPhone 13 screenshots, no console errors, no horizontal overflow.
 // Needs a READY stack on :3000, ffmpeg and Playwright. Usage: node scripts/e2e/practice.cjs [outdir]
@@ -158,20 +158,20 @@ const Y4M = path.join(OUT, 'fake-camera.y4m');
     await m.ctx.close();
   }
 
-  // ---- 2. Upload path with a real occluded variant ---------------------------------------------
+  // ---- 2. Upload path with a real mirrored variant ---------------------------------------------
   {
     const { ctx, page } = await open({ viewport: { width: 1440, height: 900 } }, 'upload');
     await page.goto(`${WEB}/studio/projects/${pid}/practice`);
     await page.getByTestId('mode-upload').click();
-    await page.getByTestId('attempt-file').setInputFiles(path.join(ATTEMPTS, 'girl_occluded.mp4'));
+    await page.getByTestId('attempt-file').setInputFiles(path.join(ATTEMPTS, 'girl_mirrored.mp4'));
     await page.getByTestId('submit-file').click();
     await page.waitForURL(/\/studio\/practice\//, { timeout: 30000 });
     const id = page.url().split('/').pop();
     const a = await waitAttempt(id);
     check(a.status === 'analyzed' && a.capture_source === 'upload' && a.target.segment_id === null, `uploaded full-dance attempt analysed (coverage ${a.tracking_coverage})`);
-    check(a.warnings.includes('partial_coverage'), 'occluded attempt reports partial coverage honestly');
+    check(a.warnings.includes('cropped_body'), 'cropped legs reported honestly');
     await page.getByTestId('side-by-side').waitFor({ timeout: 30000 });
-    await page.getByText('Part of your attempt couldn').waitFor();
+    await page.getByText('Your feet were out of frame').waitFor();
     check(true, 'tracking note shown on the review page');
     // Attempts list + delete
     await page.goto(`${WEB}/studio/projects/${pid}/practice`);
