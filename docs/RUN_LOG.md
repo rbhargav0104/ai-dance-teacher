@@ -152,3 +152,4 @@ skinned model) only after Outcomes 6–8.
   my check demanded all four leg bones be unmeasured. Fixed the check (not the threshold): the stage now exposes the clip's
   ghosted bones and the check asserts exactly those are never animated at every timestamp. Arm angles on CI matched local
   (girl median 1.5–1.9°, boy median 3.8–4.9°, max 27.6°).
+- CI run 45786324936 (b930a3b) → **green** (backend, frontend, smoke incl. Teacher Mode browser check in READY, then LIMITED smoke).
