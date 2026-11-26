@@ -88,6 +88,8 @@ export interface WorldFrame {
   valid: boolean;
   world: Vec3[] | null;
   reliable: boolean[];
+  /** Landmarks filled across a short gap (≤ 2 analysed frames). Usable, but drawn faint. */
+  bridged?: boolean[];
 }
 
 /** MediaPipe world (x right, y down, z toward camera negative) → avatar space (y up, +z toward camera). */
@@ -106,10 +108,26 @@ export function unit(a: Vec3): Vec3 | null {
 }
 export const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
+function usable(f: WorldFrame, i: number): boolean {
+  return Boolean(f.reliable[i] || f.bridged?.[i]) && Array.isArray(f.world?.[i]);
+}
+
+function refIndices(ref: BoneDef["from"] | BoneDef["to"]): number[] {
+  if (ref === "hips") return [LM.L_HIP, LM.R_HIP];
+  if (ref === "shoulders") return [LM.L_SHOULDER, LM.R_SHOULDER];
+  if (ref === "nose") return [LM.NOSE];
+  return [ref];
+}
+
+/** True when any landmark the bone depends on was bridged rather than measured in this frame. */
+export function boneBridged(f: WorldFrame, bone: BoneDef): boolean {
+  return [...refIndices(bone.from), ...refIndices(bone.to)].some((i) => !f.reliable[i] && Boolean(f.bridged?.[i]));
+}
+
 function point(f: WorldFrame, ref: BoneDef["from"] | BoneDef["to"]): Vec3 | null {
   const w = f.world;
   if (!w) return null;
-  const ok = (i: number) => Boolean(f.reliable[i]) && Array.isArray(w[i]);
+  const ok = (i: number) => usable(f, i);
   if (ref === "hips") return ok(LM.L_HIP) && ok(LM.R_HIP) ? toAvatarSpace(mid(w[LM.L_HIP], w[LM.R_HIP])) : null;
   if (ref === "shoulders")
     return ok(LM.L_SHOULDER) && ok(LM.R_SHOULDER) ? toAvatarSpace(mid(w[LM.L_SHOULDER], w[LM.R_SHOULDER])) : null;
@@ -149,6 +167,7 @@ export function buildRig(frames: WorldFrame[], minTracked = 0.5): ClipRig {
   for (const bone of BONES) {
     const ls: number[] = [];
     for (const f of valid) {
+      if (boneBridged(f, bone)) continue; // lengths and tracked fraction count measured frames only
       const a = point(f, bone.from);
       const b = point(f, bone.to);
       if (a && b) ls.push(norm(sub(b, a)));
@@ -171,12 +190,16 @@ export function buildRig(frames: WorldFrame[], minTracked = 0.5): ClipRig {
   };
 }
 
+export type BoneState = "measured" | "bridged" | "untracked";
+
 export interface BonePose {
   name: BoneName;
   start: Vec3;
   end: Vec3;
   dir: Vec3;
+  /** measured or bridged: the direction comes from this video's landmarks. */
   measured: boolean;
+  state: BoneState;
 }
 
 export interface AvatarPose {
@@ -193,20 +216,24 @@ export interface AvatarPose {
  */
 export function poseFrame(f: WorldFrame, rig: ClipRig): AvatarPose {
   const bones = {} as Record<BoneName, BonePose>;
+  // Bones the clip rarely tracked stay ghosted throughout, so the "not tracked in this video"
+  // label is never contradicted by sporadic (usually edge-of-frame) detections.
+  const held = new Set(rig.untracked);
   const dirOf = (b: BoneDef) => {
-    const d = f.valid ? boneDirection(f, b) : null;
-    return { dir: d ?? b.rest, measured: d !== null };
+    const d = f.valid && !held.has(b.name) ? boneDirection(f, b) : null;
+    const state: BoneState = d === null ? "untracked" : boneBridged(f, b) ? "bridged" : "measured";
+    return { dir: d ?? b.rest, measured: d !== null, state };
   };
   const byName = Object.fromEntries(BONES.map((b) => [b.name, b])) as Record<BoneName, BoneDef>;
   const place = (name: BoneName, start: Vec3) => {
-    const { dir, measured } = dirOf(byName[name]);
+    const { dir, measured, state } = dirOf(byName[name]);
     const end = add(start, scale(dir, rig.lengths[name]));
-    bones[name] = { name, start, end, dir, measured };
+    bones[name] = { name, start, end, dir, measured, state };
     return end;
   };
 
   const w = f.world;
-  const rel = (i: number) => Boolean(f.valid && w && f.reliable[i]);
+  const rel = (i: number) => Boolean(f.valid && w && usable(f, i));
   const axisOf = (l: number, r: number): Vec3 | null =>
     rel(l) && rel(r) ? unit(sub(toAvatarSpace(w![l]), toAvatarSpace(w![r]))) : null;
   // Measured axes pointing to the dancer's left. Facing the camera (+z), the dancer's left is +x.
@@ -249,11 +276,14 @@ export const MIRROR_MAP: number[] = (() => {
  * and swap left/right landmarks so the mirrored dancer's "left" is anatomically consistent.
  */
 export function mirrorFrame(f: WorldFrame): WorldFrame {
-  if (!f.world) return { ...f, reliable: MIRROR_MAP.map((j) => f.reliable[j] ?? false) };
+  const bridged = f.bridged ? MIRROR_MAP.map((j) => f.bridged![j] ?? false) : undefined;
+  const reliable = MIRROR_MAP.map((j) => f.reliable[j] ?? false);
+  if (!f.world) return { ...f, reliable, bridged };
   return {
     ...f,
     world: MIRROR_MAP.map((j) => [-f.world![j][0], f.world![j][1], f.world![j][2]] as Vec3),
-    reliable: MIRROR_MAP.map((j) => f.reliable[j] ?? false),
+    reliable,
+    bridged,
   };
 }
 

@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-26 ~02:30 IST (build session 4)_
+_Last updated: 2026-11-26 ~14:15 IST (build session 5)_
 
 ## Outcomes
 
@@ -10,7 +10,7 @@ _Last updated: 2026-11-26 ~02:30 IST (build session 4)_
 | 1 | Robust private reference intake | **tested** | Exit gate met (see below). Gap: no licence-verified *full-body* reference clip found yet — both committed samples crop the dancer above the knees. |
 | 2 | Real reference pose + debugger | **tested** | Exit gate met (evidence below). Delivered a session early. Postgres `SKIP LOCKED` claiming deferred to Outcome 10 as planned. |
 | 3 | Teachable sections | **tested** | Exit gate met (evidence below). Avatar retargeting maths started (`frontend/lib/avatar/retarget.ts`, unit-tested). |
-| 4 | Teacher Mode — **3D AI avatar teacher with voice** | planned | Scope changed by the owner on Nov 25 (docs/SPEC_AMENDMENTS.md A1). Target Nov 27–28. |
+| 4 | Teacher Mode — **3D AI avatar teacher with voice** | **tested** | Exit gate (A1) met on desktop + iPhone 13 (evidence below), a day early. Unverified: real spoken audio (headless browsers have the API, not speakers) and GPU frame rate on real devices. Optional v2 skinned avatar not started. |
 | 5 | Learner capture + real learner pose | planned | |
 | 6 | Normalized alignment | planned | |
 | 7 | Versioned scoring | planned | |
@@ -19,7 +19,23 @@ _Last updated: 2026-11-26 ~02:30 IST (build session 4)_
 | 10 | Production identity + durable infra | planned | |
 | 11 | Stable deployment + full acceptance | planned | |
 
-States: planned → implemented → tested → deployed. On the revised plan: Outcome 3 done in the Nov 26 am session; Outcome 4 (3D avatar) starts next.
+States: planned → implemented → tested → deployed. Ahead of the revised plan: Outcome 4 done Nov 26 pm (planned Nov 27–28). Next: Outcome 5 learner capture.
+
+### Outcome 4 exit gate — evidence (docs/SPEC_AMENDMENTS.md A1)
+- *Learn a sample section by section from the 3D avatar, desktop + mobile*: `node scripts/e2e/teacher-mode.cjs` (also in CI)
+  opens both analysed Mixkit samples at 1440×900 and iPhone 13: avatar stage renders, count-in "5 6 7 8" appears, the
+  section plays at 1× with captions ("Raise your right arm above shoulder level."), Side / 3/4 / Front cameras, swap to
+  video-main with avatar PiP, Mark complete → Next section → Previous → undo; no console errors, no horizontal overflow.
+  Play/loop/0.25–1×/mirror are the Outcome 3 controls, now driving the avatar too (`learn-mode.cjs` still passes).
+- *Avatar arm matches the measured landmarks at known timestamps*: rendered bone directions (read back from the meshes)
+  vs raw API world landmarks at t = 1, 3, 5.5, 8, 10.5, 12.5 s, mirror on and off. Girl sample: median 2.2°, max 6.1°
+  (36 bones). Boy sample: median 3.7–5.5°, max 27.9° (one fast forearm; smoothing + depth noise). Gate: median ≤ 8°, max ≤ 30°.
+  Screenshots at those timestamps are uploaded as a CI artifact (`teacher-mode-screenshots`).
+- *Untracked limbs visibly marked, not animated*: both samples crop the legs → "Not tracked in this video: legs · shown
+  ghosted" and every leg bone reports `untracked` at every checked timestamp (rest pose, 16% opacity).
+- *Unit tests of the retargeting maths*: `tests/avatar-retarget.test.ts`, `avatar-track.test.ts` (One-Euro, gap bridging
+  ≤ 2 frames, rare-limb ghosting, direction interpolation, fixed lengths, lost/outside, mirror side swap),
+  `avatar-cues.test.ts` (perspective wording, caption timing, 8-count, count-in).
 
 ### Outcome 3 exit gate — evidence
 - *Sections cover the whole video without gap/overlap*: analysis now ends with a `segmenting` stage that suggests
@@ -56,6 +72,13 @@ States: planned → implemented → tested → deployed. On the revised plan: Ou
 - *Refresh preserves project/job state*: `test_list_get_refresh_and_delete_cascade` reads the project + intake job from a fresh app instance; Playwright flow reloads `/studio` and the library shows the uploads.
 
 ## What exists today
+
+- **Teacher Mode — 3D AI avatar (Outcome 4)**: an analysed dance opens on a studio stage where an original procedural
+  mannequin performs the dancer's measured movement (MediaPipe world landmarks, One-Euro smoothed, fixed bone lengths).
+  It follows the section player (loop, 0.25–1×, mirror by default), with the real video picture-in-picture (swap with
+  **Video ⤢ / Avatar ⤢**), Front / 3/4 / Side cameras plus drag-to-orbit, a coach bar with always-on captions, an even
+  8-count, a **Voice** toggle (Web Speech) and a "5, 6, 7, 8" count-in. Untracked limbs are ghosted and labelled;
+  unmeasured moments show "Tracking lost here". Without WebGL it says so and keeps the 2-D skeleton on the video.
 
 - **Learn Mode + teachable sections (Outcome 3)**: an analysed dance opens on a section player — large canonical video
   (mirrored by default), Play/Restart/±1 analysed frame, 0.25/0.5/0.75/1× speed, Loop, Mirror, Skeleton toggles; a
@@ -98,6 +121,14 @@ States: planned → implemented → tested → deployed. On the revised plan: Ou
 - **CI** (`.github/workflows/ci.yml`): backend ruff + mypy strict + pytest (incl. real model load) + pose smoke;
   frontend eslint + tsc + vitest + build; end-to-end boot smoke.
 
+## Verified claims — session 5 (2026-11-26 pm)
+
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 67 passed.
+- Backend unchanged this session; `cd backend && uv run pytest -q` at session start → all passed (Outcome 3 gate re-check).
+- `scripts/smoke.sh` on built web + API (READY) → SMOKE OK.
+- `node scripts/e2e/teacher-mode.cjs` → TEACHER MODE CHECK OK (numbers above); `node scripts/e2e/learn-mode.cjs` → loop max
+  6.877 s < 6.917 s, edits persist, no errors/overflow. Screenshots of desktop, mobile, all three camera views, PiP reviewed.
+
 ## Verified claims — session 4 (2026-11-26 am)
 
 - `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 169 passed.
@@ -135,13 +166,13 @@ States: planned → implemented → tested → deployed. On the revised plan: Ou
 
 ## Known gaps / unverified
 
-- Not built yet: the 3D avatar teacher (Outcome 4, owner amendment A1). Today a dance page shows the video with a
-  skeleton overlay and a developer debugger. Those are analysis views, not the teaching experience.
-- Library cards show an empty placeholder instead of the poster frame; studio sample copy still says "once analysis is on".
+- Avatar: spoken audio not verified by a human ear yet (headless Chromium exposes speechSynthesis but has no speakers);
+  real-device GPU frame rate not measured (headless SwiftShader software GL renders ~37 fps). Avatar stays hip-centred
+  (no floor travel). Torso twist comes from the shoulder line only. Skinned v2 avatar not started (optional per A1).
+- Library cards show an empty placeholder instead of the poster frame.
 - Section instructions use 2-D image-plane angles (foreshortening can under-read elbow angles, e.g. "about 20°") and assume
   the dancer faces the camera; labelled experimental. Boundary tuning is checked on 2 real clips + synthetic sequences.
 - While editing, chips whose boundaries moved show no thumbnail until saved (server regenerates them).
-- World landmarks used by the avatar are stored raw; the avatar will smooth them (One-Euro) client-side in Outcome 4.
 
 - Smoothing parameters and gate thresholds (55%/85% coverage, 20% multi-person, 0.5 visibility) are spec defaults checked
   on 2 clips + variants only; recalibrate with more fixtures (Outcome 7).
@@ -160,17 +191,17 @@ _None. The owner only tests. Sessions source every asset themselves (see `docs/S
 ## How Bhargav can test right now
 
 The one-click Codespaces path lands on Dec 3. Until then:
-1. Open the repo's **Actions** tab: the latest **CI** run is green (verified for 037ecfe) (backend incl. real-footage analysis tests, frontend, smoke
-   which analyses the sample end to end on a READY server and checks LIMITED mode without the vision stack).
+1. Open the repo's **Actions** tab → latest **CI** run. The *smoke* job now also runs the Teacher Mode browser check;
+   download the **teacher-mode-screenshots** artifact to see the avatar next to the video at fixed timestamps.
 2. Optional, on a machine with Node 20+, [uv](https://docs.astral.sh/uv/) and ffmpeg (Linux also: `libegl1 libgles2 libgl1`):
    `scripts/setup.sh && scripts/dev.sh`, then
-   - http://localhost:3000/studio?demo=1 → **Use this sample** → watch the progress ring (~10 s) → the skeleton tracks the
-     dancer on the video → **Open pose debugger** → step frames with ← / →, toggle IDs, click landmarks;
-   - on the dance page, pick a section on the timeline, press play (it loops the section at 0.5×), try 0.25×, Mirror off
-     (the instruction swaps left/right), **Edit sections** → drag a lime handle / Split at playhead → **Save sections**,
-     reload, then **Mark complete** and **Next section**;
-   - upload your own MP4/MOV/WebM at http://localhost:3000/studio → **Analyze Choreography**. A clip with two people, or one
-     where you leave the frame for most of it, should stop with a clear explanation instead of a result.
+   - http://localhost:3000/studio?demo=1 → **Use this sample** → wait ~10 s for the analysis → the 3D avatar appears;
+   - press play: you hear/see "5, 6, 7, 8", then the avatar dances the section at 0.5× while the video plays small in the
+     corner and the coach bar captions (and speaks) the measured cue. Try 0.25×, **Mirror** off, **Side** / **3/4**, drag to
+     orbit, **Video ⤢** to swap, **Voice** off; the legs are ghosted with a "not tracked in this video" label because the
+     sample crops them;
+   - **Mark complete** → **Next section**; **Edit sections** still lets you drag/split boundaries;
+   - on a phone (same Wi-Fi, http://<laptop-ip>:3000) the stage switches to a tall layout.
 
 ## Owner testing path (target)
 - **GitHub Codespaces:** repo page → Code → Codespaces → Create. The devcontainer installs everything, downloads the model, seeds the demo, and starts the app on a forwarded HTTPS URL (webcam works).

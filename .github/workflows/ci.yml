@@ -101,6 +101,18 @@ jobs:
           done
       - name: Smoke
         run: scripts/smoke.sh
+      - name: Teacher Mode browser check (3D avatar vs measured landmarks)
+        run: |
+          mkdir -p /tmp/pw e2e-shots
+          (cd /tmp/pw && npm init -y >/dev/null && npm install --no-audit --no-fund playwright@1.63.0 && npx playwright install --with-deps chromium)
+          NODE_PATH=/tmp/pw/node_modules node scripts/e2e/teacher-mode.cjs e2e-shots
+      - name: Upload Teacher Mode screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: teacher-mode-screenshots
+          path: e2e-shots
+          if-no-files-found: ignore
       - name: Smoke (LIMITED without the vision stack)
         run: |
           pkill -f "uvicorn app.main:app" || true

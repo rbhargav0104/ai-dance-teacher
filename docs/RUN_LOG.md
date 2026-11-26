@@ -116,3 +116,34 @@ Next (Nov 26 pm / Nov 27, Outcome 4): three.js + R3F stage, procedural mannequin
 (client-side One-Euro smoothing of world landmarks), ghosted untracked limbs with labels, avatar in Learn Mode synced
 to the section player (loop/speed/mirror), camera presets, PiP video, WebGL fallback; Playwright avatar-vs-landmark check.
 - CI run 45697822079 (037ecfe) → **green** (frontend, backend, smoke incl. sections in READY and LIMITED).
+
+## 2026-11-26 13:43–14:20 IST — build session 5 (Outcome 4: 3D avatar teacher with voice)
+Start: repo at b94d414 (detached checkout → reset local `main` to origin/main). `add_repo`/`register_repo_root` not offered;
+repo already cloned with push access. Outcome 3 gate re-checked: `scripts/setup.sh`, backend `uv run pytest -q` all passed,
+frontend suite green, `learn-mode.cjs` passed again at the end.
+
+Delivered:
+- `frontend/lib/avatar/track.ts` (One-Euro on world landmarks, ≤ 2-frame bridging, posed track, interpolated sampling,
+  lost/outside states, untracked-part labels), `cues.ts` (measured-fact captions per perspective, even 8-count, count-in),
+  `stage-config.ts`; `retarget.ts` gains bridged state + whole-clip ghosting of rarely tracked bones.
+- `components/avatar-stage.tsx`: R3F stage (floor, lights, shadows), procedural mannequin (capsule limbs, tapered torso
+  aligned to the shoulder line, pelvis, head, lime joints), ghost/bridged materials, camera presets with eased moves
+  (snap with reduced motion), orbit, error boundary, debug snapshot of rendered bones for the browser check.
+- `learn-studio.tsx`: avatar-first surface with PiP video and swap, coach bar (captions, 8-count dots, Voice, camera
+  views), count-in overlay, Web Speech cues, WebGL fallback notice, muted-retry if sound is blocked after the count-in.
+- `scripts/e2e/teacher-mode.cjs` + CI step (Playwright 1.63.0, SwiftShader) with screenshot artifact.
+
+Commands and results:
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 67 passed (17 new).
+- `scripts/smoke.sh` (READY) → SMOKE OK.
+- `node scripts/e2e/teacher-mode.cjs <dir>` → TEACHER MODE CHECK OK. Arms rendered vs raw landmarks: girl median 2.2° max 6.1°;
+  boy median 3.7–5.5° max 27.9°. Legs untracked on both. 0 console errors, 0 px overflow (desktop, iPhone 13).
+- `node scripts/e2e/learn-mode.cjs` → loop max 6.877 s (< 6.917 s), reload keeps edits, no errors.
+
+Found and fixed during the run: sporadic thigh detections on the boy clip animated legs the label called untracked
+(→ whole-clip ghosting); stale copy ("3D avatar … being built next", "once analysis is on"); mobile PiP covered the
+untracked label and the swap button covered the PiP dancer.
+
+Next (Nov 27, ahead of plan): Outcome 5 — learner capture (webcam with countdown + upload), real learner pose through the
+same pipeline, attempt fixtures generated with FFmpeg from real footage (docs/SOURCING.md). Avatar polish (travel, v2
+skinned model) only after Outcomes 6–8.

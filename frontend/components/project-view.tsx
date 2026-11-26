@@ -218,7 +218,7 @@ export function ProjectView() {
                 Open pose debugger
               </Link>
               <p className="text-sm text-muted">
-                Every joint, angle and confidence value measured from this video. The 3D avatar teacher is being built next.
+                Every joint, angle and confidence value measured from this video — the same data that drives the 3D avatar.
               </p>
             </div>
           ) : busy ? null : p.status === "failed" && !canStart ? (

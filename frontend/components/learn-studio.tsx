@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ApiError, getSections, mediaHref, regenerateSections, saveSections, updateSection } from "@/lib/api";
@@ -19,9 +20,49 @@ import {
   toDraft,
   toEdits,
 } from "@/lib/sections";
+import { countAt, countIn, cueIndexAt, sectionCues } from "@/lib/avatar/cues";
+import { CAMERA_VIEWS, type CameraView, hasWebGL } from "@/lib/avatar/stage-config";
+import { buildTrack } from "@/lib/avatar/track";
 import type { PosesResponse, Section, SectionsResponse } from "@/lib/types";
 
 import { SkeletonOverlay } from "./skeleton-overlay";
+
+// three.js only loads on the client, and only once a dance with poses is open.
+const AvatarStage = dynamic(() => import("./avatar-stage").then((m) => m.AvatarStage), {
+  ssr: false,
+  loading: () => <div className="absolute inset-0 animate-pulse bg-raised/40" aria-label="Loading the 3D stage" />,
+});
+
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const set = () => setReduced(mq.matches);
+    set();
+    mq.addEventListener("change", set);
+    return () => mq.removeEventListener("change", set);
+  }, []);
+  return reduced;
+}
+
+const speechAvailable = () => typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
+
+function speak(text: string) {
+  if (!speechAvailable()) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.02;
+    u.lang = "en-US";
+    window.speechSynthesis.speak(u);
+  } catch {
+    /* speech is best-effort; captions always show the same words */
+  }
+}
+function hush() {
+  if (speechAvailable()) window.speechSynthesis.cancel();
+}
 
 type VideoWithFrames = HTMLVideoElement & {
   requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number;
@@ -143,6 +184,23 @@ export function LearnStudio({
   const [draft, setDraft] = useState<DraftSection[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [primary, setPrimary] = useState<"avatar" | "video">("avatar");
+  const [view, setView] = useState<CameraView>("front");
+  const [voice, setVoice] = useState(true);
+  const [webgl, setWebgl] = useState<boolean | null>(null);
+  const [countdown, setCountdown] = useState<string | null>(null);
+  const countTimers = useRef<number[]>([]);
+  const reducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    // Checked on the client only; null until then so SSR and hydration agree.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time capability probe
+    setWebgl(hasWebGL());
+  }, []);
+
+  const tracks = useMemo(() => (poses ? { direct: buildTrack(poses, false), mirror: buildTrack(poses, true) } : null), [poses]);
+  const avatarOn = Boolean(tracks && webgl);
+  const avatarPrimary = avatarOn && primary === "avatar";
 
   useEffect(() => {
     let cancelled = false;
@@ -182,16 +240,80 @@ export function LearnStudio({
     [sections, seek],
   );
 
+  const cancelCountIn = useCallback(() => {
+    countTimers.current.forEach((h) => window.clearTimeout(h));
+    countTimers.current = [];
+    setCountdown(null);
+  }, []);
+  useEffect(() => cancelCountIn, [cancelCountIn]);
+
+  const play = (v: HTMLVideoElement) =>
+    void v.play().catch(() => {
+      // After a count-in, play() is no longer inside the click, and some browsers block sound.
+      if (v.muted) return setNotice("Playback was blocked by the browser. Press play again.");
+      v.muted = true;
+      void v
+        .play()
+        .then(() => setNotice("The browser blocked the video's sound after the count-in, so it plays muted this time. Turn Voice off to start without the count-in and keep the sound."))
+        .catch(() => setNotice("Playback was blocked by the browser. Press play again."));
+    });
+
   const togglePlay = () => {
     const v = videoRef.current;
     if (!v) return;
+    if (countdown !== null) {
+      cancelCountIn();
+      hush();
+      return;
+    }
     if (v.paused) {
       if (current && !editing && (v.currentTime < current.start || v.currentTime >= current.end - FRAME)) {
         v.currentTime = current.start;
       }
-      void v.play().catch(() => setNotice("Playback was blocked by the browser. Press play again."));
+      // Count in ("5, 6, 7, 8") when the coach is on and the section starts from the top.
+      if (current && !editing && voice && Math.abs(v.currentTime - current.start) < FRAME * 1.5) {
+        const { words, beatMs } = countIn(current, speed);
+        words.forEach((w, i) =>
+          countTimers.current.push(
+            window.setTimeout(() => {
+              setCountdown(w);
+              speak(w);
+            }, i * beatMs),
+          ),
+        );
+        countTimers.current.push(
+          window.setTimeout(() => {
+            setCountdown(null);
+            countTimers.current = [];
+            play(v);
+          }, words.length * beatMs),
+        );
+        return;
+      }
+      v.muted = false; // direct click: sound is allowed again
+      play(v);
     } else v.pause();
   };
+
+  // Captions always show; the voice reads the same measured cue when it changes.
+  const cues = useMemo(() => (current ? sectionCues(current, mirror) : []), [current, mirror]);
+  const cueIdx = cueIndexAt(cues, now);
+  const cueText = cueIdx >= 0 ? cues[cueIdx].text : (cues[0]?.text ?? null);
+  const beat = current ? countAt(current, now) : null;
+  const lastSpoken = useRef<string | null>(null);
+  useEffect(() => {
+    if (!playing || !voice || cueIdx < 0 || editing) {
+      lastSpoken.current = null;
+      return;
+    }
+    const key = `${current?.id}:${cueIdx}:${mirror}`;
+    if (lastSpoken.current === key) return;
+    lastSpoken.current = key;
+    speak(cues[cueIdx].text);
+  }, [playing, voice, cueIdx, cues, current?.id, mirror, editing]);
+  useEffect(() => {
+    if (!playing || !voice) hush();
+  }, [playing, voice]);
 
   const instruction = current ? (mirror ? current.instruction : current.instruction_direct ?? current.instruction) : null;
   const doneCount = sections.filter((s) => s.completed).length;
@@ -264,31 +386,97 @@ export function LearnStudio({
   return (
     <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="flex min-w-0 flex-col gap-4">
-        <div className="relative overflow-hidden rounded-3xl border border-line bg-black">
-          <div className={`relative aspect-video max-h-[68vh] w-full ${mirror ? "-scale-x-100" : ""}`} data-testid="mirror-surface" data-mirrored={mirror}>
-            <video
-              ref={videoRef}
-              key={src}
-              src={src}
-              playsInline
-              preload="auto"
-              data-testid="learn-video"
-              className="absolute inset-0 h-full w-full bg-black object-contain"
-              onError={onVideoError}
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onClick={togglePlay}
-            />
-            {poses && skeleton && <SkeletonOverlay videoRef={videoRef} poses={poses} />}
+        <div
+          className={`relative w-full overflow-hidden rounded-3xl border border-line bg-black ${avatarPrimary ? "aspect-[4/5] max-h-[72vh] sm:aspect-video sm:max-h-[68vh]" : "aspect-video max-h-[68vh]"}`}
+          data-testid="teacher-surface"
+          data-primary={avatarOn ? primary : "video"}
+        >
+          {avatarOn && tracks && (
+            <div
+              className={
+                primary === "avatar"
+                  ? "absolute inset-0"
+                  : "absolute bottom-3 right-3 z-10 aspect-[4/5] w-[30%] max-w-56 overflow-hidden rounded-2xl ring-2 ring-line sm:aspect-video sm:w-[32%] sm:max-w-none"
+              }
+            >
+              <AvatarStage
+                track={mirror ? tracks.mirror : tracks.direct}
+                videoRef={videoRef}
+                view={view}
+                reducedMotion={reducedMotion}
+                compact={primary !== "avatar"}
+                fallback={<StageFallback />}
+              />
+            </div>
+          )}
+          <div
+            className={
+              avatarPrimary
+                ? "absolute right-3 top-3 z-10 aspect-video w-[42%] max-w-72 overflow-hidden rounded-2xl ring-2 ring-line sm:bottom-3 sm:top-auto sm:w-[30%]"
+                : "absolute inset-0"
+            }
+            data-testid="video-layer"
+          >
+            <div className={`relative h-full w-full ${mirror ? "-scale-x-100" : ""}`} data-testid="mirror-surface" data-mirrored={mirror}>
+              <video
+                ref={videoRef}
+                key={src}
+                src={src}
+                playsInline
+                preload="auto"
+                data-testid="learn-video"
+                className="absolute inset-0 h-full w-full bg-black object-contain"
+                onError={onVideoError}
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onClick={togglePlay}
+              />
+              {poses && skeleton && <SkeletonOverlay videoRef={videoRef} poses={poses} />}
+            </div>
           </div>
+          {avatarOn && (
+            <button
+              type="button"
+              onClick={() => setPrimary(primary === "avatar" ? "video" : "avatar")}
+              className={`absolute z-20 rounded-full bg-studio/85 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink ring-1 ring-line backdrop-blur transition hover:ring-lime/60 ${
+                avatarPrimary ? "bottom-4 right-4 sm:bottom-5 sm:right-5" : "bottom-5 right-5"
+              }`}
+            >
+              {avatarPrimary ? "Video ⤢" : "Avatar ⤢"}
+            </button>
+          )}
           {current && !editing && (
-            <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2 rounded-full bg-studio/80 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-ink backdrop-blur">
+            <div className="pointer-events-none absolute bottom-4 left-4 z-10 flex items-center gap-2 rounded-full bg-studio/80 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-ink backdrop-blur">
               <span className="text-lime">{String(current.position + 1).padStart(2, "0")}</span>
               {formatClock(current.start)}–{formatClock(current.end)}
               {mirror && <span className="text-muted">· mirrored</span>}
             </div>
           )}
+          {countdown && (
+            <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-studio/40" aria-live="assertive" data-testid="count-in">
+              <span key={countdown} className="font-display text-8xl font-semibold text-lime motion-safe:animate-[countpop_0.4s_ease-out]">
+                {countdown}
+              </span>
+            </div>
+          )}
         </div>
+        {webgl === false && poses && (
+          <p className="text-sm text-amber" role="status">
+            This browser can&apos;t draw 3D (WebGL is off), so the avatar is replaced by the 2-D skeleton on the video.
+          </p>
+        )}
+
+        {current && !editing && (
+          <CoachBar
+            text={cueText}
+            beat={playing ? beat : null}
+            voice={voice}
+            setVoice={setVoice}
+            canSpeak={speechAvailable()}
+            view={avatarOn ? view : null}
+            setView={setView}
+          />
+        )}
 
         <Transport
           playing={playing}
@@ -401,6 +589,78 @@ export function LearnStudio({
         )}
         {aside}
       </aside>
+    </div>
+  );
+}
+
+function StageFallback() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-amber">
+      The 3D stage couldn&apos;t start in this browser. Use the video view with the skeleton instead.
+    </div>
+  );
+}
+
+function CoachBar({
+  text,
+  beat,
+  voice,
+  setVoice,
+  canSpeak,
+  view,
+  setView,
+}: {
+  text: string | null;
+  beat: number | null;
+  voice: boolean;
+  setVoice: (v: boolean) => void;
+  canSpeak: boolean;
+  view: CameraView | null;
+  setView: (v: CameraView) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-raised/60 p-3 sm:flex-row sm:items-center" data-testid="coach-bar">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-lime/15 text-lime" aria-hidden>
+          <svg viewBox="0 0 24 24" className="size-4">
+            <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />
+            {voice && <path d="M16 8.5a4.5 4.5 0 0 1 0 7M18.5 6a8 8 0 0 1 0 12" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" />}
+          </svg>
+        </span>
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">
+            Coach <span className="rounded-full border border-amber/50 px-1.5 text-amber">experimental</span>
+            <span className="flex gap-1" aria-label={beat ? `Count ${beat} of 8` : "Even 8-count"}>
+              {Array.from({ length: 8 }, (_, i) => (
+                <span key={i} className={`size-1.5 rounded-full ${beat !== null && i < beat ? "bg-lime" : "bg-line"}`} />
+              ))}
+            </span>
+          </p>
+          <p className="mt-1 text-base leading-snug text-ink" aria-live="polite" data-testid="coach-caption">
+            {text ?? "Pick a section to hear its cue."}
+          </p>
+          {voice && !canSpeak && <p className="mt-1 text-xs text-muted">This browser has no speech voice. Captions only.</p>}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {view && (
+          <div role="radiogroup" aria-label="Camera view" className="flex rounded-full border border-line p-0.5">
+            {CAMERA_VIEWS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                role="radio"
+                aria-checked={view === c.id}
+                onClick={() => setView(c.id)}
+                className={`rounded-full px-2.5 py-1.5 font-mono text-xs transition ${view === c.id ? "bg-ink text-studio" : "text-muted hover:text-ink"}`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <Toggle label="Voice" on={voice} set={setVoice} />
+      </div>
     </div>
   );
 }

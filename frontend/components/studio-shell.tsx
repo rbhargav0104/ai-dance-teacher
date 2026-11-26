@@ -151,7 +151,7 @@ function SamplePicker({ onAdded, disabled }: { onAdded: (p: Project) => void; di
       <p className="mt-2 max-w-2xl text-muted">
         Real stock dance footage (Mixkit Free License), added to your studio through the same private
         upload checks as your own videos. Both clips crop the dancer above the knees, so lower-body
-        feedback will be limited once analysis is on.
+        detail is limited: the avatar shows the legs ghosted instead of guessing them.
       </p>
       {samples.kind === "pending" ? (
         <div className="mt-5 h-28 animate-pulse rounded-3xl border border-line bg-raised/40" aria-busy />
