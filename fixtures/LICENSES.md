@@ -24,6 +24,6 @@ download as stock footage.
 ## attempts/*.mp4 (learner-attempt fixtures)
 - Derived from the two Mixkit clips above (same Mixkit Free License, credit: video by Mixkit) with FFmpeg by
   `scripts/make_attempt_fixtures.py`: 640x360, 24 fps, H.264 CRF 28, no audio. Variants: re-encode (`girl_good`),
-  60% size + shifted, +0.4 s late, 0.9x / 1.1x speed, mirrored, middle replaced by a 4 s hold, hips covered 5–8 s,
+  60% size + shifted, +0.4 s late, 0.9x / 1.1x speed, mirrored, middle replaced by a 4 s hold, view fully blocked 5–8 s,
   and the other dance as a wrong-dance attempt. Exact commands, SHA-256 and the expected relationship of each
   variant are in `fixture_manifest.json` → `attempts`. No landmarks are fabricated: each is a real video.

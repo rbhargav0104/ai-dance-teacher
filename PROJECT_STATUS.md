@@ -31,11 +31,10 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
   after 2 s of playback), measured skeletons on both, 0.5/0.75/1×, scrub, mirror; tracking stats + notes, "nothing on this
   page is a score". Desktop 1440×900 and iPhone 13: no console errors, no horizontal overflow.
 - *Upload path + honest quality*: the real `girl_mirrored` variant uploaded via the file picker → analysed, cropped-legs
-  note shown. (The occluded variant lands either side of the 55% coverage gate depending on CPU: 0.73 locally, failed
-  `low_coverage` on the CI runner — both honest; the pytest asserts the masked frames in either case.) Camera permission denied → "Camera access is blocked" + upload fallback. Attempt delete from the list → 404.
+  note shown.  Camera permission denied → "Camera access is blocked" + upload fallback. Attempt delete from the list → 404.
 - *Same pipeline, same gates* (`tests/test_practice_analysis.py`, real MediaPipe on FFmpeg variants of real footage):
   thresholds/smoothing/model identical to the reference; `girl_good` coverage within 0.08 of the reference; skeleton lands on
-  the learner's pixels; occluded 5–8 s frames invalid (≥ 80%) and coverage ≥ 0.15 lower; two dancers → `multiple_people`
+  the learner's pixels; view blocked 5–8 s → those frames invalid (≥ 80%) and coverage ≥ 0.15 lower; two dancers → `multiple_people`
   (still inspectable); the dance's own status/latest job untouched by attempt jobs; delete while queued removes the job.
 - *API contract* (`tests/test_practice_api.py`, 13 tests): 409 before the dance is analysed; private 0600 storage, ranged
   media; LIMITED stores but never analyses (503); idempotent retry; per-dance quota; owner isolation (same 404); 5 rejection
@@ -207,6 +206,9 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 - Practice: not yet tried with a human on a real laptop webcam or phone camera (Safari records MP4 — code path exists,
   untested). Side-by-side is lined up from the start only; movement alignment, mirror detection, scores and feedback are
   Outcomes 6–8. Upload goes through the Next proxy (buffers in memory, see below).
+- Quality gate weakness: a grey band over only the dancer's hips made MediaPipe report two people on the CI runner,
+  so that clip failed as `multiple_people` (misleading — there is one dancer). Fixture changed to a full-view block;
+  the gate should ignore second detections overlapping the main dancer (Outcome 7 calibration).
 - Torso scale measured 0.48× (not 0.6×) on the 60%-scaled variant (hips on the frame edge) — Outcome 6 normalization input.
 
 - Avatar: spoken audio not verified by a human ear yet (headless Chromium exposes speechSynthesis but has no speakers);

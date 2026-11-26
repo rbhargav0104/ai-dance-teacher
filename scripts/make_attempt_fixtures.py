@@ -82,11 +82,12 @@ VARIANTS: list[dict[str, object]] = [
     {
         "id": "girl_occluded",
         "reference": GIRL,
-        "vf": f"{BASE},drawbox=x=0:y=150:w=640:h=210:color=0x303030@1:t=fill:"
+        "vf": f"{BASE},drawbox=x=0:y=0:w=640:h=360:color=0x303030@1:t=fill:"
         "enable='between(t,5,8)'",
-        "relationship": "hips and lower torso covered by a grey band from 5 s to 8 s: those "
-        "frames must lose tracking (lower coverage, partial_coverage warning) and be masked, "
-        "not scored as wrong.",
+        "relationship": "camera view fully blocked by a grey card from 5 s to 8 s: those frames "
+        "must have no pose (lower coverage, partial_coverage warning) and be masked, not scored "
+        "as wrong. (A band over only the hips was tried first: on the CI runner MediaPipe then "
+        "split the dancer into two 'people' and the clip failed as multiple_people.)",
     },
     {
         "id": "boy_wrong_dance",

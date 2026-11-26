@@ -185,3 +185,6 @@ original timestamps, invariance tests on the attempt fixtures (scaled/translated
   55% gate; 0.73 locally). Honest either way, so the test now accepts analysed-with-partial_coverage or failed-low_coverage
   and still asserts the 5–8 s frames are masked. The browser check now uploads `girl_mirrored` (always analysable) and
   checks the cropped-legs note. Re-ran locally: practice pytest 2 passed, PRACTICE CHECK OK.
+- CI run 45896052094 (367be1c): backend red again — the real cause was `multiple_people`, not coverage: the hip band split
+  the dancer into two detections on the runner. Regenerated `girl_occluded` as a full-view block (5–8 s), restored the strict
+  assertions (analysed + partial_coverage), recorded the gate weakness in PROJECT_STATUS/DECISIONS. Practice pytest 2 passed locally.
