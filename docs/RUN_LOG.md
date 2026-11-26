@@ -188,3 +188,7 @@ original timestamps, invariance tests on the attempt fixtures (scaled/translated
 - CI run 45896052094 (367be1c): backend red again — the real cause was `multiple_people`, not coverage: the hip band split
   the dancer into two detections on the runner. Regenerated `girl_occluded` as a full-view block (5–8 s), restored the strict
   assertions (analysed + partial_coverage), recorded the gate weakness in PROJECT_STATUS/DECISIONS. Practice pytest 2 passed locally.
+- CI run 45897294082 (514f483): backend + frontend **green**; smoke red on one Practice check only — the live preview's
+  `videoWidth` was read before the fake camera's first frame on the runner (0x0). Everything else passed on CI (webcam
+  attempt 64 frames / 47 valid / coverage 0.73, drift 0.000 s, mirrored upload, denied camera). The check now waits for
+  the first frame.

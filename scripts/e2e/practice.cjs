@@ -76,6 +76,7 @@ const Y4M = path.join(OUT, 'fake-camera.y4m');
     await page.screenshot({ path: path.join(OUT, 'practice-intro-desktop.png') });
     await page.getByTestId('camera-on').click();
     await page.locator('[data-phase="live"]').waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => (document.querySelector('video[aria-label^="Live camera"]')?.videoWidth ?? 0) > 0, null, { timeout: 15000 });
     const live = await page.locator('video[aria-label^="Live camera"]').evaluate((v) => { const cs = getComputedStyle(v); return { w: v.videoWidth, h: v.videoHeight, mirrored: `${cs.scale} ${cs.transform}` }; });
     check(live.w > 0 && live.h > 0, `live camera preview ${live.w}x${live.h}`);
     check(/^-1 1\b|matrix\(-1/.test(live.mirrored), `preview mirrored (${live.mirrored})`);
