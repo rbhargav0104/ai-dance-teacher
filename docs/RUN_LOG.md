@@ -264,3 +264,5 @@ Found during the run: position-only following handed the chosen person to the ot
 for a frame (the only remaining detection was "near enough"); appearance is now required whenever it is measurable.
 
 Next: Outcome 7 — versioned scoring on top of `align-1` (confidence/coverage rules, golden-fixture relationship tests).
+- CI run 46066755574 (5a4576c) on `build` → **green** (backend incl. real-footage A2 tests, frontend, smoke incl. Teacher
+  Mode, Practice and the new Choose-the-dancer browser checks, then LIMITED smoke). `main` fast-forwarded.
