@@ -20,6 +20,8 @@ Each session starts fresh: this repo is the only memory between runs.
 3. Finish any partial outcome before starting the next one.
 
 ## Hard rules
+- **Robustness first (owner, 2026-11-27: "I want the MVP to be ROBUST").** Prefer fewer features that never break over
+  more features that sometimes do: handle every failure path, test it, and never ship a red build to `main`.
 - No fake AI: no random, hard-coded or invented scores, poses or feedback. Synthetic landmark sequences are for pure-math unit tests only.
 - Unavailable inference → explicit LIMITED state, never a simulated result.
 - Never commit secrets, real credentials, or `.env` files. Only `.env.example`.
