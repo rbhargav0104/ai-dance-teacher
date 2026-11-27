@@ -52,3 +52,4 @@ Append new entries at the bottom. Format: date — decision — reason.
 - 2026-11-27 — `girl_occluded` fixture blocks the whole view 5–8 s instead of a band over the hips: with the band, the CI
   runner's MediaPipe saw two partial "people" (>20% of frames) and the clip failed `multiple_people`. Kept as a known gate
   weakness (second detections overlapping the main dancer should not count as another person) for Outcome 7.
+- 2026-11-27 — Owner: "jobs are failing" (red CI emails from pushes that went to `main` before CI passed: runs 12, 15, 16, 17). Process change: sessions push to `build`, CI runs there, `main` is only fast-forwarded once green. CI now also runs on pushes to `build`. — Owner request, live.

@@ -28,5 +28,12 @@ Each session starts fresh: this repo is the only memory between runs.
 - Report progress by outcomes and exit gates, never percentages.
 
 ## End of every session
-Update PROJECT_STATUS.md, append docs/RUN_LOG.md, update DECISIONS.md if needed, commit, and push to `main`
-(the owner has asked for direct pushes to main for this project).
+Update PROJECT_STATUS.md, append docs/RUN_LOG.md, update DECISIONS.md if needed, commit.
+
+## Shipping: `main` only ever receives green code (owner decision 2026-11-27)
+The owner gets a GitHub email for every red CI run on `main`, so never push untested work to `main`.
+1. Push work to the `build` branch (`git push origin HEAD:build`, force-with-lease is fine — `build` is scratch).
+2. Wait for the CI run on `build` (backend, frontend, smoke) and fix it there until it is green.
+3. Only then fast-forward `main`: `git push origin HEAD:main`. No merge commits, no PRs.
+4. If it can't be made green before the session ends, leave `main` untouched, record the state in
+   PROJECT_STATUS.md on `build`, and say so in the owner update.
