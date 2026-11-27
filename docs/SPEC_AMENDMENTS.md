@@ -66,3 +66,41 @@ not animated. Verified by:
 Outcome 4 grows. Revised pacing is in IMPLEMENTATION_PLAN.md. If time runs short, the order stays: real scoring
 (Outcomes 6–7) and honest feedback (Outcome 8) are not skipped. Instead, avatar polish (v2 skinned model, camera
 presets) is cut first, and that slip is recorded in PROJECT_STATUS.md.
+
+---
+
+## A2 — Choose the dancer when a video has more than one person (owner, 2026-11-27)
+
+> Owner: "if there are multiple people in the video, I should get the option to choose the subject."
+
+This replaces the spec's "multi-person footage fails" behaviour (§11 tracking suitability, §12 quality gates, §27) for
+both reference videos and learner attempts.
+
+### Behaviour
+- When analysis sees more than one person for a meaningful share of the video, it does **not** fail. It stops at a
+  **"Who should we follow?"** step: a frame from the video with each detected person outlined and numbered (plus a
+  thumbnail crop of each). The user taps one.
+- Analysis then follows that person for the whole video (the existing identity-tracking in `select_track`, seeded by
+  the chosen person instead of "largest body"). Other people are ignored, never mixed in.
+- The choice is stored (which person, at which timestamp, how they were described) and shown on the dance/attempt page,
+  with **"Follow someone else"** to re-run with a different choice.
+- If the chosen person is lost for a stretch (they leave frame, or people cross and identity is uncertain), those frames
+  are masked and labelled "lost the dancer you chose here" — never silently switched to another person.
+- Single-person videos are unchanged: no extra step.
+- A brief extra person (e.g. walking past) keeps today's behaviour: follow the main dancer, show a warning.
+
+### Robustness requirements
+- Candidate people are real MediaPipe detections from the video (up to 4); nothing is guessed or drawn by hand.
+- A second detection that overlaps the main dancer's body (the CI false positive recorded 2026-11-27) is not counted
+  as another person.
+- Crossing/occlusion tests on real FFmpeg-composited fixtures (two real clips side by side, swapped positions, one
+  walking out): the chosen person is kept, or frames are masked; never a silent switch.
+- The API is idempotent and works in LIMITED mode (the choice can be stored; analysis is still refused honestly).
+
+### Exit gate
+On a real two-dancer fixture: the user picks the left dancer → skeleton, sections, avatar and scores all follow the
+left dancer; re-running with the right dancer follows the right one; a crossing fixture never switches silently.
+Verified by API tests on real footage and a Playwright check of the picker on desktop and mobile.
+
+### Schedule
+Lands with Outcome 6 (next build sessions), before scoring, so scores are never computed on the wrong person.

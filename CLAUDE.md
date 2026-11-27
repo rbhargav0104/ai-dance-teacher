@@ -6,7 +6,7 @@ Each session starts fresh: this repo is the only memory between runs.
 ## Source of truth
 - `docs/MASTER_PROMPT.md` — the full product + engineering spec. Its non-negotiable rules (section 3) always win.
 - `docs/SPEC_AMENDMENTS.md` — owner decisions that override parts of the spec (A1: **3D AI avatar teacher with voice**
-  is MVP scope, centrepiece of Outcome 4). Read it every session.
+  is MVP scope, centrepiece of Outcome 4; A2: **pick the dancer** when a video has several people). Read it every session.
 - `IMPLEMENTATION_PLAN.md` — outcome order and daily pacing targets.
 - `PROJECT_STATUS.md` — what is implemented / tested / deployed / planned, and "Owner action needed".
 - `DECISIONS.md` — material decisions (append, never rewrite history).

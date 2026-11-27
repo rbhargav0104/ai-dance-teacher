@@ -29,3 +29,8 @@ Outcome 2. If still behind, cut avatar polish (skinned v2 model, extra camera pr
 
 If behind schedule: keep the order. Correctness, tests and honest-state rules come before visual expansion.
 Never skip an exit gate; record any slip in PROJECT_STATUS.md.
+
+## Owner amendment (2026-11-27)
+A2 (docs/SPEC_AMENDMENTS.md): when a video has several people, the user chooses whom to follow instead of the upload
+failing. Built alongside Outcome 6, before Outcome 7 scoring. Also: robustness first, and `main` only receives code
+that is green in CI (see CLAUDE.md "Shipping").
