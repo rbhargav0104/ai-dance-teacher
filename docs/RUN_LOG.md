@@ -224,3 +224,6 @@ Tuning notes (real footage, mean distance): good 0.07, shifted 0.07, speed 0.9×
 
 Next: A2 — "Who should we follow?" for multi-person references and attempts (real detections, stored choice, re-pick,
 no silent identity switch, overlapping-detection fix), then Outcome 7 versioned scoring on top of `align-1`.
+- CI run 45970269449 (ecf4e5d) on `build` → **green** (backend incl. real-footage alignment tests, frontend, smoke incl.
+  Teacher Mode + Practice browser checks with alignment, LIMITED smoke). `main` fast-forwarded to ecf4e5d.
+  This run-log line is on `build` only; the next session ships it to `main` with its own green run.
