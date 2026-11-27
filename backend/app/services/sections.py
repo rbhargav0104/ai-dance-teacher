@@ -208,17 +208,46 @@ def _write(
         new_rows.append(row)
 
     stale = [s.thumbnail_key for s in existing.values() if s.thumbnail_key]
-    for s in list(project.segments):
-        db.delete(s)
+    # Update surviving sections IN PLACE (same primary key) rather than delete + re-insert:
+    # deleting would fire ON DELETE SET NULL on practice_sessions.segment_id and silently
+    # detach every attempt from its section on any edit. Only sections that are gone are
+    # deleted. Positions go through temporary negatives to respect (project_id, position).
+    new_ids = {r.id for r in new_rows}
+    for seg in list(project.segments):
+        if seg.id not in new_ids:
+            project.segments.remove(seg)
+    for i, seg in enumerate(project.segments):
+        seg.position = -(i + 1)
     db.flush()
-    project.segments.clear()
-    db.add_all(new_rows)
+    current = {seg.id: seg for seg in project.segments}
+    for row in new_rows:
+        target = current.get(row.id)
+        if target is None:
+            project.segments.append(row)
+            continue
+        for col in _SEGMENT_COPY:
+            setattr(target, col, getattr(row, col))
     db.commit()
     for key in stale:
         if key not in keep_keys:
             storage.delete(key)
     db.refresh(project)
     return list(project.segments)
+
+
+_SEGMENT_COPY = (
+    "position",
+    "start_time",
+    "end_time",
+    "title",
+    "boundary_source",
+    "instruction",
+    "facts",
+    "coverage",
+    "algorithm_version",
+    "thumbnail_key",
+    "completed",
+)
 
 
 def generate_automatic(

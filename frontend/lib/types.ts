@@ -291,3 +291,83 @@ export interface PracticeList {
   sessions: PracticeSession[];
   limit: number;
 }
+
+/** One reference frame's match in an attempt alignment (backend app.pose.alignment). */
+export interface AlignmentFrame {
+  ref_t: number; // seconds from the start of the practised window
+  ref_src_t: number; // seconds on the reference video's own timeline
+  learner_t: number;
+  learner_src_t: number;
+  cost: number | null; // null = not measurable on both videos (masked, never "wrong")
+  position: number | null;
+  angle: number | null;
+  lean: number | null;
+  direction: number | null;
+  measured: boolean;
+  reused: boolean;
+  offset_s: number;
+  missing: boolean;
+}
+
+export type AlignmentStatus = "aligned" | "insufficient_reference" | "insufficient_tracking" | "out_of_band";
+
+export interface Alignment {
+  version: string;
+  status: AlignmentStatus | string;
+  message?: string | null;
+  scorable: boolean;
+  reference_frames: number;
+  learner_frames: number;
+  reference_usable_frames: number;
+  learner_usable_frames: number;
+  window?: { start: number; end: number; segment_id: string | null };
+  preferred_reason?: string;
+  mirror?: {
+    chosen: "direct" | "mirrored";
+    decision: "clear" | "ambiguous";
+    preferred: "direct" | "mirrored";
+    margin: number;
+    mean_cost: { direct: number | null; mirrored: number | null };
+  };
+  body_size_factor?: number | null;
+  body_size_segments?: number;
+  band_s?: number | null;
+  reference_immobile?: boolean;
+  reference_median_energy?: number | null;
+  path?: [number, number][];
+  frames?: AlignmentFrame[];
+  summary?: {
+    mean_cost: number | null;
+    median_cost: number | null;
+    equal_time_cost: number | null;
+    measured_fraction: number | null;
+    masked_fraction: number | null;
+    missing_fraction: number | null;
+    reuse_fraction: number | null;
+    confidence: number | null;
+  };
+  timing?: {
+    median_offset_s: number | null;
+    speed_ratio: number | null;
+    fit_intercept_s: number | null;
+    max_local_deviation_s: number | null;
+    off_spans: [number, number][];
+  };
+  warp?: {
+    non_diagonal_fraction: number | null;
+    max_learner_hold_s: number | null;
+    max_reference_hold_s: number | null;
+    learner_start_s: number | null;
+    learner_end_s: number | null;
+    attempt_ended_early_s?: number | null;
+  };
+  masked_spans?: [number, number][];
+  missing_spans?: [number, number][];
+  config?: Record<string, unknown>;
+}
+
+export interface AlignmentResponse {
+  practice_id: string;
+  cached: boolean;
+  alignment: Alignment;
+}

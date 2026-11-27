@@ -55,3 +55,28 @@ Append new entries at the bottom. Format: date — decision — reason.
 - 2026-11-27 — Owner: "jobs are failing" (red CI emails from pushes that went to `main` before CI passed: runs 12, 15, 16, 17). Process change: sessions push to `build`, CI runs there, `main` is only fast-forwarded once green. CI now also runs on pushes to `build`. — Owner request, live.
 - 2026-11-27 — Owner amendment A2: multi-person videos lead to a "choose the dancer" step (real detections, stored choice,
   re-pickable, no silent identity switches) instead of failing `multiple_people`. Scheduled with Outcome 6, before scoring.
+- 2026-11-27 — Alignment `align-1` (`app/pose/alignment.py`): per-pair cost = 0.45 position + 0.30 joint angles + 0.10
+  lean + 0.15 motion direction, each ~1.0 for "clearly different" (0.6 torso, 60°, 30°, opposite direction); position and
+  angle terms = ½ mean + ½ mean of the worst 3 joints / 2 angles, so one wrong limb isn't diluted. Depth weight 0.3. — Spec 17;
+  coefficients versioned and tested.
+- 2026-11-27 — Normalization for comparison: global body-size factor = median of reference/learner limb-segment length ratios
+  (clamped 0.67–1.5) plus a per-pair translation + uniform scale fit (±15 %) over joints measured on both. — Torso length
+  alone is wrong when hips sit on the frame edge (60 % variant measured 0.48×); the clamp keeps wrong-extension errors visible.
+- 2026-11-27 — Bounded DTW in seconds: |t_learner − t_ref| ≤ max(2 s, 0.35 × window); warp penalty 0.15/step; free
+  learner lead-in and tail; a recording that stops early may hold its last frame (reported as `attempt_ended_early_s`).
+  Two passes: unmeasured pairs first cost 0.8, then the attempt's own median measured cost (clamped 0.1–0.8). — Fixed
+  high cost made the path hold one measured frame for seconds to avoid untracked frames (seen on the 60 % variant).
+- 2026-11-27 — Mirror handling: compare as recorded and mirrored (reflect x + swap sides); switch from the preferred mode
+  only when ≥ 10 % cheaper, otherwise keep it and record "ambiguous". Preferred = mirrored only if the upload was declared
+  mirrored (Learn Mode's default mirror view means learners use the dancer's own side → "as recorded"). Stored in
+  `practice_sessions.detected_mirror_choice`.
+- 2026-11-27 — Timing kept on original timestamps: median offset, Theil–Sen pace (robust to held tails), per-frame local
+  deviation, timing spans > 0.3 s. Missing = reference moving (≥ max(0.15, ½ median energy)) and the learner still (< 30 %)
+  or clearly different (cost ≥ 0.75); untracked frames are "masked", never missing; masked gaps ≤ 1 s don't split a span.
+- 2026-11-27 — Alignment computed on demand and cached on the attempt (migration 0006, key = version + both analyses +
+  window + declared mirror); needs numpy only, so LIMITED servers still serve/compute from stored real frames.
+- 2026-11-27 — Bug fixed: saving section edits deleted and re-inserted every section, which fired ON DELETE SET NULL and
+  silently detached every practice attempt from its section. Surviving sections are now updated in place. — Found by the
+  alignment cache-invalidation test.
+- 2026-11-27 — Attempt review follows the alignment path by default ("Matched moves"), "Same time" for clock playback. — The
+  point of Outcome 6 for the learner: late or slower attempts still show the matching moves side by side.

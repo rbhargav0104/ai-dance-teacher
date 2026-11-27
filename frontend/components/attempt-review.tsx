@@ -10,11 +10,13 @@ import {
   getMedia,
   getPoses,
   getPractice,
+  getPracticeAlignment,
   getPracticeMedia,
   getPracticePoses,
   mediaHref,
   startPracticeAnalysis,
 } from "@/lib/api";
+import { referenceTimeAt, timingFacts } from "@/lib/alignment";
 import { formatDuration } from "@/lib/media";
 import { FAILURE_HELP, percent, stageLabel } from "@/lib/pose";
 import {
@@ -25,7 +27,7 @@ import {
   referenceTimeFor,
   reviewLength,
 } from "@/lib/practice";
-import type { PosesResponse, PracticeSession } from "@/lib/types";
+import type { Alignment, PosesResponse, PracticeSession } from "@/lib/types";
 
 import { ProgressRing } from "./analysis-status";
 import { AttemptChip } from "./practice-studio";
@@ -230,10 +232,10 @@ function RetryButton({ id, onDone, setNotice, label }: { id: string; onDone: () 
 }
 
 /**
- * Reference section and learner attempt side by side, one transport. Both start at the
- * beginning of what was practised; the learner video leads and the reference follows
- * (re-seeked when it drifts). This is time-lined-up playback, not movement alignment —
- * alignment and comparison arrive with Outcome 6.
+ * Reference section and learner attempt side by side, one transport. The learner video leads
+ * and the reference follows (re-seeked when it drifts): by default along the measured
+ * alignment path (Outcome 6), so a late start or a slower pace still shows matching moves;
+ * "Same time" switches back to plain equal-time playback.
  */
 function SideBySide({ attempt }: { attempt: PracticeSession }) {
   const refVideo = useRef<HTMLVideoElement | null>(null);
@@ -248,8 +250,16 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
   const [skeleton, setSkeleton] = useState(true);
   const [mirror, setMirror] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [alignment, setAlignment] = useState<Alignment | null>(null);
+  const [alignNote, setAlignNote] = useState<string | null>(null);
+  const [followPath, setFollowPath] = useState(true);
   const target = attempt.target;
   const length = reviewLength(target, attempt.canonical_duration);
+  const paired = alignment?.status === "aligned" ? alignment : null;
+  const refTime = useCallback(
+    (lt: number) => (followPath && paired ? (referenceTimeAt(paired, lt) ?? referenceTimeFor(target, lt)) : referenceTimeFor(target, lt)),
+    [followPath, paired, target],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -266,6 +276,13 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
     getPracticePoses(attempt.id)
       .then((p) => !cancelled && setLearnerPoses(p))
       .catch(() => {});
+    getPracticeAlignment(attempt.id)
+      .then((r) => {
+        if (cancelled) return;
+        setAlignment(r.alignment);
+        if (r.alignment.status !== "aligned") setAlignNote(r.alignment.message ?? "These moves couldn't be paired.");
+      })
+      .catch((err: unknown) => !cancelled && setAlignNote(err instanceof Error ? err.message : "Alignment isn't available."));
     return () => {
       cancelled = true;
     };
@@ -275,10 +292,10 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
     (s: number) => {
       const clamped = Math.max(0, Math.min(length, s));
       if (learnerVideo.current) learnerVideo.current.currentTime = clamped;
-      if (refVideo.current) refVideo.current.currentTime = referenceTimeFor(target, clamped);
+      if (refVideo.current) refVideo.current.currentTime = refTime(clamped);
       setT(clamped);
     },
-    [length, target],
+    [length, refTime],
   );
 
   // Lock-step loop: the learner leads, the reference is corrected when it drifts.
@@ -290,7 +307,7 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
       const r = refVideo.current;
       if (l && r) {
         const lt = l.currentTime;
-        const want = referenceTimeFor(target, lt);
+        const want = refTime(lt);
         if (needsResync(want, r.currentTime)) r.currentTime = want;
         setT(lt);
         if (lt >= length - 0.02 || l.ended) {
@@ -304,7 +321,7 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [playing, length, target]);
+  }, [playing, length, refTime]);
 
   useEffect(() => {
     for (const v of [learnerVideo.current, refVideo.current]) if (v) v.playbackRate = speed;
@@ -315,7 +332,7 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
     const r = refVideo.current;
     if (!l || !r) return;
     if (t >= length - 0.05) seek(0);
-    r.currentTime = referenceTimeFor(target, l.currentTime);
+    r.currentTime = refTime(l.currentTime);
     l.playbackRate = speed;
     r.playbackRate = speed;
     try {
@@ -355,7 +372,7 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
                 preload="auto"
                 data-testid="review-reference"
                 onLoadedMetadata={(e) => {
-                  e.currentTarget.currentTime = referenceTimeFor(target, t);
+                  e.currentTarget.currentTime = refTime(t);
                 }}
                 className="absolute inset-0 h-full w-full object-contain"
               />
@@ -437,12 +454,30 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
           ))}
           <Toggle on={skeleton} set={setSkeleton} label="Skeleton" />
           <Toggle on={mirror} set={setMirror} label="Mirror" />
+          {paired && (
+            <button
+              type="button"
+              aria-pressed={followPath}
+              onClick={() => {
+                setFollowPath((v) => !v);
+                pause();
+              }}
+              data-testid="review-follow-path"
+              className={`rounded-full px-3 py-1.5 text-xs ${followPath ? "border border-lime/60 text-lime" : "border border-line text-muted hover:text-ink"}`}
+            >
+              {followPath ? "Matched moves" : "Same time"}
+            </button>
+          )}
         </div>
       </div>
-      <p className="mt-2 text-xs text-muted">
-        Both videos start at the beginning of {target.segment_id ? "the section" : "the dance"} and play in step. Movement alignment and scoring
-        come next — nothing on this page is a score.
+      <p className="mt-2 text-xs text-muted" data-testid="review-sync-note">
+        {paired && followPath
+          ? "The reference follows your moves along the measured alignment, so a late start or a different pace still lines up. Switch to “Same time” to compare by the clock."
+          : `Both videos start at the beginning of ${target.segment_id ? "the section" : "the dance"} and play in step by the clock.`}{" "}
+        Nothing on this page is a score.
       </p>
+
+      <AlignmentSummary attemptId={attempt.id} alignment={alignment} note={alignNote} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <dl className="grid grid-cols-3 gap-px self-start overflow-hidden rounded-2xl border border-line bg-line" data-testid="attempt-tracking">
@@ -463,6 +498,34 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function AlignmentSummary({ attemptId, alignment, note }: { attemptId: string; alignment: Alignment | null; note: string | null }) {
+  if (!alignment && !note) return null;
+  const facts = alignment ? timingFacts(alignment) : [];
+  return (
+    <div className="mt-6 rounded-2xl border border-line p-4 text-sm" data-testid="alignment-summary">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Timing &amp; sides · measured</p>
+        {alignment && (
+          <Link href={`/studio/practice/${attemptId}/alignment`} className="text-xs text-lime underline-offset-4 hover:underline" data-testid="alignment-link">
+            See how moves were paired →
+          </Link>
+        )}
+      </div>
+      {note ? (
+        <p className="mt-2 text-amber">{note}</p>
+      ) : facts.length ? (
+        <ul className="mt-2 space-y-1.5 text-ink">
+          {facts.map((f) => (
+            <li key={f}>· {f}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-muted">Your timing and sides line up with the reference.</p>
+      )}
     </div>
   );
 }

@@ -56,6 +56,17 @@ const Y4M = path.join(OUT, 'fake-camera.y4m');
     args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-video-capture=${Y4M}`,
       '--autoplay-policy=no-user-gesture-required', '--enable-unsafe-swiftshader', '--use-angle=swiftshader'],
   });
+  // Same rule as frontend/lib/alignment.ts referenceTimeAt (kept deliberately simple here).
+  function expectedRef(frames, lt) {
+    const p = frames.map((f, i) => ({ l: f.learner_t, r: f.ref_src_t, i })).sort((a, b) => a.l - b.l || a.i - b.i);
+    if (lt <= p[0].l) return p[0].r;
+    if (lt >= p[p.length - 1].l) return p[p.length - 1].r;
+    let hi = p.findIndex((q) => q.l >= lt);
+    while (hi > 0 && p[hi - 1].l === p[hi].l) hi--;
+    const a = p[hi - 1], b = p[hi];
+    return b.l === a.l ? b.r : a.r + ((lt - a.l) / (b.l - a.l)) * (b.r - a.r);
+  }
+
   async function open(ctxOpts, name) {
     const ctx = await browser.newContext({ ...ctxOpts, permissions: ['camera'] });
     await ctx.addInitScript((t) => localStorage.setItem('adt.session.v1', t), tok);
@@ -128,6 +139,15 @@ const Y4M = path.join(OUT, 'fake-camera.y4m');
       const l = document.querySelector('[data-testid="review-learner"]');
       return r && l && r.readyState >= 2 && l.readyState >= 2;
     }, null, { timeout: 30000 });
+    // Alignment (Outcome 6): summary loads; "Same time" gives clock playback for this check.
+    await page.getByTestId('alignment-summary').waitFor({ timeout: 30000 });
+    const alRes = await j(await fetch(WEB + `/api/practice-sessions/${attemptId}/alignment`, { headers: H }));
+    const al = alRes.alignment;
+    check(al.version === 'align-1' && typeof al.status === 'string', `alignment computed: ${al.status}, mean distance ${al.summary && al.summary.mean_cost}, mirror ${al.mirror && al.mirror.chosen}`);
+    const follow = page.getByTestId('review-follow-path');
+    const hasFollow = (await follow.count()) > 0;
+    check(hasFollow === (al.status === 'aligned'), 'matched-moves toggle offered exactly when moves were paired');
+    if (hasFollow) await follow.click();
     await page.getByTestId('review-play').click();
     await page.waitForTimeout(2000);
     const sync = await page.evaluate((start) => {
@@ -137,10 +157,37 @@ const Y4M = path.join(OUT, 'fake-camera.y4m');
     }, section.start);
     check(sync.playing && sync.learner > 1 && Math.abs(sync.drift) < 0.2, `side-by-side in step: learner ${sync.learner.toFixed(2)}s, reference ${sync.ref.toFixed(2)}s, drift ${sync.drift.toFixed(3)}s`);
     await page.getByTestId('review-play').click();
+    if (hasFollow) {
+      // Back to matched moves: the reference must follow the alignment path.
+      await follow.click();
+      await page.getByLabel('Back to the start').click();
+      await page.getByTestId('review-play').click();
+      await page.waitForTimeout(1500);
+      await page.getByTestId('review-play').click();
+      await page.waitForTimeout(300);
+      const pos = await page.evaluate(() => ({
+        ref: document.querySelector('[data-testid="review-reference"]').currentTime,
+        learner: document.querySelector('[data-testid="review-learner"]').currentTime,
+      }));
+      const want = expectedRef(al.frames, pos.learner);
+      check(Math.abs(pos.ref - want) < 0.25, `matched moves: learner ${pos.learner.toFixed(2)}s → reference ${pos.ref.toFixed(2)}s (path says ${want.toFixed(2)}s)`);
+    }
     const skel = await page.locator('[data-testid="side-by-side"] canvas').count();
     check(skel === 2, 'measured skeletons drawn on both videos');
     await page.screenshot({ path: path.join(OUT, 'attempt-review-desktop.png') });
     check((await overflow(page)) <= 0, 'desktop review: no horizontal overflow');
+    // Developer alignment view.
+    await page.getByTestId('alignment-link').click();
+    await page.waitForURL(/\/alignment$/, { timeout: 15000 });
+    await page.getByTestId('alignment-report').waitFor({ timeout: 30000 });
+    const shown = await page.getByTestId('alignment-report').getAttribute('data-status');
+    check(shown === al.status, `alignment view shows status ${shown}`);
+    if (al.status === 'aligned') {
+      const dots = await page.locator('[data-testid="alignment-path"] circle').count();
+      check(dots === al.frames.length, `alignment path draws every paired reference frame (${dots})`);
+    }
+    await page.screenshot({ path: path.join(OUT, 'alignment-desktop.png'), fullPage: true });
+    check((await overflow(page)) <= 0, 'desktop alignment view: no horizontal overflow');
     await ctx.close();
 
     // ---- iPhone 13: review page + practice page ----------------------------------------------
@@ -150,6 +197,10 @@ const Y4M = path.join(OUT, 'fake-camera.y4m');
     await m.page.waitForTimeout(800);
     await m.page.screenshot({ path: path.join(OUT, 'attempt-review-mobile.png'), fullPage: true });
     check((await overflow(m.page)) <= 0, 'mobile review: no horizontal overflow');
+    await m.page.goto(`${WEB}/studio/practice/${attemptId}/alignment`);
+    await m.page.getByTestId('alignment-report').waitFor({ timeout: 30000 });
+    await m.page.screenshot({ path: path.join(OUT, 'alignment-mobile.png'), fullPage: true });
+    check((await overflow(m.page)) <= 0, 'mobile alignment view: no horizontal overflow');
     await m.page.goto(`${WEB}/studio/projects/${pid}/practice`);
     await m.page.getByTestId('camera-on').click();
     await m.page.locator('[data-phase="live"]').waitFor({ timeout: 15000 });
@@ -171,6 +222,9 @@ const Y4M = path.join(OUT, 'fake-camera.y4m');
     const a = await waitAttempt(id);
     check(a.status === 'analyzed' && a.capture_source === 'upload' && a.target.segment_id === null, `uploaded full-dance attempt analysed (coverage ${a.tracking_coverage})`);
     check(a.warnings.includes('cropped_body'), 'cropped legs reported honestly');
+    const mal = (await j(await fetch(WEB + `/api/practice-sessions/${id}/alignment`, { headers: H }))).alignment;
+    check(mal.status === 'aligned' && mal.mirror.chosen === 'mirrored' && mal.mirror.decision === 'clear',
+      `flipped upload compared mirrored (as recorded ${mal.mirror && mal.mirror.mean_cost.direct}, mirrored ${mal.mirror && mal.mirror.mean_cost.mirrored})`);
     await page.getByTestId('side-by-side').waitFor({ timeout: 30000 });
     await page.getByText('Your feet were out of frame').waitFor();
     check(true, 'tracking note shown on the review page');

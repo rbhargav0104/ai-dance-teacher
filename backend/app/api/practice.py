@@ -34,6 +34,7 @@ from app.media.signing import MEDIA_TOKEN_TTL_SECONDS, MediaGrant, sign_media
 from app.media.upload import MULTIPART_OVERHEAD_BYTES, receive_upload
 from app.models import DanceSegment, PracticeSession, UserPoseFrame
 from app.pose import landmarks as LM  # noqa: N812
+from app.services.alignment import get_alignment
 from app.services.intake import clean_filename, validate_idempotency_key
 from app.services.practice import (
     CAPTURE_SOURCES,
@@ -342,6 +343,29 @@ def get_practice_poses(
             for r in rows
         ],
     )
+
+
+class AlignmentOut(BaseModel):
+    practice_id: str
+    cached: bool
+    # Raw alignment report (app.pose.alignment.align). Measurements, not a dance score.
+    alignment: dict[str, Any]
+
+
+@router.get("/api/practice-sessions/{session_id}/alignment", response_model=AlignmentOut)
+def get_practice_alignment(
+    session_id: str,
+    user: CurrentUser,
+    db: Annotated[Session, Depends(get_db)],
+    response: Response,
+) -> AlignmentOut:
+    """Mirror-aware bounded-DTW alignment of the attempt to its reference window (Outcome 6).
+    Computed from stored frames on first request and cached until either analysis or the
+    section boundaries change. 409 when either side isn't analysed, 503 without numpy."""
+    practice = owned_practice(db, user.id, session_id)
+    result, cached = get_alignment(db, practice)
+    response.headers["Cache-Control"] = "private, no-store"
+    return AlignmentOut(practice_id=practice.id, cached=cached, alignment=result)
 
 
 @router.get("/api/practice-sessions/{session_id}/media/{kind}", response_model=MediaUrl)

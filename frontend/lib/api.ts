@@ -1,4 +1,5 @@
 import type {
+  AlignmentResponse,
   ApiErrorBody,
   HealthResponse,
   JobInfo,
@@ -313,6 +314,7 @@ export const startPracticeAnalysis = (id: string, rerun = false) =>
     body: JSON.stringify({ rerun }),
   });
 export const getPracticePoses = (id: string) => authed<PosesResponse>(`${practicePath(id)}/poses`);
+export const getPracticeAlignment = (id: string) => authed<AlignmentResponse>(`${practicePath(id)}/alignment`);
 export const getPracticeMedia = (id: string, kind: MediaKind = "canonical") =>
   authed<MediaUrl>(`${practicePath(id)}/media/${kind}`);
 

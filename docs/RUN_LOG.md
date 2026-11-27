@@ -193,3 +193,34 @@ original timestamps, invariance tests on the attempt fixtures (scaled/translated
   attempt 64 frames / 47 valid / coverage 0.73, drift 0.000 s, mirrored upload, denied camera). The check now waits for
   the first frame.
 - CI run 45898502567 (0f00636) → **green** (backend, frontend, smoke incl. Teacher Mode + Practice browser checks in READY, then LIMITED smoke).
+
+## Session 7 — 2026-11-27 13:44–15:40 IST (Outcome 6: normalized alignment)
+
+Start: Outcome 5 gate re-check `cd backend && uv run pytest -q` → all passed. A2 (owner, choose the dancer) read; deferred
+to the next session so Outcome 6 could land complete and tested (robustness first).
+
+Delivered:
+- `backend/app/pose/alignment.py` (`align-1`): comparison features from stored payloads, limb-ratio body-size factor,
+  per-pair translation + bounded scale fit, focus-weighted cost mixture (position/angles/lean/direction), mirror trial with
+  recorded decision, two-pass bounded DTW in seconds with warp penalty and open learner begin/end, collapse of reused
+  learner frames, timing on original timestamps (offset, Theil–Sen pace, local deviation, ended-early), masked vs missing
+  spans, gates (insufficient reference/tracking, out of band, immobile reference → not scorable).
+- `GET /api/practice-sessions/{id}/alignment` + cache on the attempt (migration 0006), `services/alignment.py`.
+- Bug fix: section edits no longer detach practice attempts (in-place update instead of delete + re-insert).
+- Frontend: `/studio/practice/[sid]/alignment` developer view (`alignment-view.tsx`), attempt review follows the
+  alignment path ("Matched moves" / "Same time") + "Timing & sides" measured facts, `lib/alignment.ts` (+ tests).
+- `scripts/e2e/practice.cjs`: alignment API, matched-moves playback vs path, alignment view desktop + mobile, flipped
+  upload compared mirrored.
+
+Commands and results:
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 217 passed
+  (+33: 31 alignment maths, 2 real-footage alignment API); one stale assertion (health reported migration 0005) fixed and re-run.
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 86 passed (+10).
+- Built web + API (READY): `scripts/smoke.sh` → SMOKE OK; `node scripts/e2e/practice.cjs` → PRACTICE CHECK OK.
+  Alignment screenshots reviewed (desktop + iPhone 13).
+
+Tuning notes (real footage, mean distance): good 0.07, shifted 0.07, speed 0.9×/1.1× 0.07 (pace 1.105/0.909), late 0.4 s
+0.07 (offset 0.42), zoom 0.8 0.16, 60 % 0.22, flipped 0.17 mirrored / 0.89 as recorded, missing-middle 0.15, different dance 0.50.
+
+Next: A2 — "Who should we follow?" for multi-person references and attempts (real detections, stored choice, re-pick,
+no silent identity switch, overlapping-detection fix), then Outcome 7 versioned scoring on top of `align-1`.

@@ -194,6 +194,9 @@ class PracticeSession(Base):
     pipeline_version: Mapped[str | None] = mapped_column(String(64))
     model_version: Mapped[str | None] = mapped_column(String(128))
     analyzed_at: Mapped[datetime | None] = mapped_column()
+    # Cached comparison alignment (migration 0006), valid only for `alignment_key`.
+    alignment: Mapped[dict[str, Any] | None] = mapped_column(JsonType)
+    alignment_key: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime | None] = mapped_column(default=utcnow, onupdate=utcnow)
 

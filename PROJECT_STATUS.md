@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-27 ~03:00 IST (build session 6)_
+_Last updated: 2026-11-27 ~15:30 IST (build session 7)_
 
 ## Outcomes
 
@@ -12,14 +12,33 @@ _Last updated: 2026-11-27 ~03:00 IST (build session 6)_
 | 3 | Teachable sections | **tested** | Exit gate met (evidence below). Avatar retargeting maths started (`frontend/lib/avatar/retarget.ts`, unit-tested). |
 | 4 | Teacher Mode — **3D AI avatar teacher with voice** | **tested** | Exit gate (A1) met on desktop + iPhone 13 (evidence below), a day early. Unverified: real spoken audio (headless browsers have the API, not speakers) and GPU frame rate on real devices. Optional v2 skinned avatar not started. |
 | 5 | Learner capture + real learner pose | **tested** | Exit gate met (evidence below), ~1.5 days ahead of plan. Real webcam path verified with Chromium's fake camera fed real footage; a human webcam + phone camera not tried yet. |
-| 6 | Normalized alignment | planned | |
+| 6 | Normalized alignment | **tested** | Exit gate met on real footage (evidence below). A2 (choose the dancer) not started — next session, before Outcome 7. |
 | 7 | Versioned scoring | planned | |
 | 8 | Actionable feedback | planned | |
 | 9 | Report, repeat, dashboard | planned | |
 | 10 | Production identity + durable infra | planned | |
 | 11 | Stable deployment + full acceptance | planned | |
 
-States: planned → implemented → tested → deployed. Ahead of the revised plan: Outcome 5 done Nov 27 am (planned Nov 28–29). Next: Outcome 6 normalized alignment.
+States: planned → implemented → tested → deployed. Ahead of the revised plan: Outcome 6 done Nov 27 pm (planned Nov 29). Next: amendment A2 (choose the dancer in multi-person videos), then Outcome 7 scoring.
+
+### Outcome 6 exit gate — evidence ("scale/translation/speed tests behave as intended while wrong-limb, late and missing-movement tests remain distinguishable")
+- *Real footage* (`tests/test_alignment_api.py`, real MediaPipe on FFmpeg variants of the Mixkit clip; mean per-pair movement
+  distance after alignment, good attempt ≈ 0.07, different dance ≈ 0.50):
+  shifted 200 px ≈ good (+0.00); speed 0.9×/1.1× ≈ good (+0.00) with pace measured 1.105/0.909 (timing kept, equal-time
+  pairing ≈ 0.21); 0.4 s late ≈ good with offset 0.42 s; zoom 0.8 and 60 % size sit at 0.21 / 0.34 of the way to a different
+  dance (the pose model measures small figures less precisely — their scale-free angle error also grows 2–4×); hflipped
+  video → mirrored chosen ("clear", 0.89 as recorded vs 0.17 mirrored); 4 s freeze → missing span 5.25–8.9 s; 3 s blocked
+  view → masked span, costs null there (never "wrong"); section attempt aligned to its window; moving the section boundary
+  invalidates the cached alignment.
+- *Synthetic invariance/sensitivity* (`tests/test_alignment_math.py`, 31 tests through the stored-payload path): size,
+  position, resolution, portrait, taller subject, ±25 % speed stay within +0.06 of identical; wrong arm height, wrong elbow,
+  opposite sweep, 28° lean, reversed phrase are ≥ +0.12; missing movement and 1 s late movement located in time; mirror
+  transform is an involution; symmetric movement keeps the preferred mode and says "ambiguous"; gates for untracked
+  attempt/reference and immobile reference; frozen learner can't earn many matches; DTW band/monotonicity/known shift.
+- *Debug alignment view*: `/studio/practice/{id}/alignment` (path chart with band, per-moment distance strip with
+  missing/masked/timing spans, stats, sides decision, measured facts). Attempt review plays the reference along the
+  alignment path by default ("Matched moves" / "Same time"). Browser check (`practice.cjs`): reference position matches
+  the path within 0.25 s, every paired frame drawn, desktop + iPhone 13 without overflow or console errors.
 
 ### Outcome 5 exit gate — evidence ("a learner attempt produces real stored pose data and can be reviewed beside the reference")
 - *Webcam → real stored pose*: `node scripts/e2e/practice.cjs` (also in CI) feeds Chromium's fake camera a real fixture
@@ -93,6 +112,16 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 
 ## What exists today
 
+- **Alignment (Outcome 6)**: `GET /api/practice-sessions/{id}/alignment` aligns an analysed attempt to its reference window
+  (`app/pose/alignment.py`, `align-1`): hip-centred torso-scaled shape + a global limb-ratio body-size factor; per pair a
+  translation + bounded (±15 %) scale fit; cost = position (depth ×0.3, worst-3-joint focus) + joint angles + lean + motion
+  direction; unmeasured pairs are masked. Learner compared as recorded and mirrored, switch only when ≥ 10 % better,
+  decision stored. Two-pass bounded DTW (±max(2 s, 35 % of the window)), warp penalty, free lead-in/tail on the learner,
+  every reference frame matched, collapse so a learner frame is credited once. Original timestamps kept: offset, robust
+  pace (Theil–Sen), local deviation, "recording ended early". Accounting: masked vs missing spans. Cached on the attempt
+  until either analysis or the section window changes; needs only numpy (works in LIMITED from stored frames).
+  Measurements only — `scored: false` until Outcome 7.
+
 - **Practice (Outcome 5)**: from a section card (**Practise this section**) or the dance page (**Practise & review attempts**)
   → `/studio/projects/{id}/practice`: pick Full dance or a section; **Record with camera** (setup tips, permission handling,
   mirrored preview saved unmirrored, framing guide, 3-2-1, REC clock with auto-stop at target + 3 s, muted reference guide in
@@ -151,6 +180,12 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 - **CI** (`.github/workflows/ci.yml`): backend ruff + mypy strict + pytest (incl. real model load) + pose smoke;
   frontend eslint + tsc + vitest + build; end-to-end boot smoke.
 
+## Verified claims — session 7 (2026-11-27 pm)
+
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → see RUN_LOG (full suite).
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 86 passed.
+- Built web + API (READY): `node scripts/e2e/practice.cjs` → PRACTICE CHECK OK incl. alignment checks; screenshots reviewed.
+
 ## Verified claims — session 6 (2026-11-27 am)
 
 - `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 184 passed.
@@ -205,12 +240,16 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 ## Known gaps / unverified
 
 - Practice: not yet tried with a human on a real laptop webcam or phone camera (Safari records MP4 — code path exists,
-  untested). Side-by-side is lined up from the start only; movement alignment, mirror detection, scores and feedback are
-  Outcomes 6–8. Upload goes through the Next proxy (buffers in memory, see below).
+  untested). Scores and feedback are Outcomes 7–8. Upload goes through the Next proxy (buffers in memory, see below).
+- Alignment: cost coefficients are calibrated on one reference clip (cropped at the hips) + its variants; smaller figures
+  read as more different because the pose model measures them less precisely. A section attempt is expected to start with
+  the section (the band is anchored at the recording's start). Re-check with more fixtures at Outcome 7.
+- A2 (choose the dancer in multi-person videos) not started; multi-person clips still fail `multiple_people`.
 - Quality gate weakness: a grey band over only the dancer's hips made MediaPipe report two people on the CI runner,
   so that clip failed as `multiple_people` (misleading — there is one dancer). Fixture changed to a full-view block;
   the gate should ignore second detections overlapping the main dancer (Outcome 7 calibration).
-- Torso scale measured 0.48× (not 0.6×) on the 60%-scaled variant (hips on the frame edge) — Outcome 6 normalization input.
+- Torso scale measured 0.48× (not 0.6×) on the 60%-scaled variant (hips on the frame edge) — handled in alignment by the
+  limb-ratio body-size factor and per-pair scale fit.
 
 - Avatar: spoken audio not verified by a human ear yet (headless Chromium exposes speechSynthesis but has no speakers);
   real-device GPU frame rate not measured (headless SwiftShader software GL renders ~37 fps). Avatar stays hip-centred
@@ -249,7 +288,9 @@ The one-click Codespaces path lands on Dec 3. Until then:
    - **Mark complete** → **Next section**; **Edit sections** still lets you drag/split boundaries;
    - on a phone (same Wi-Fi, http://<laptop-ip>:3000) the stage switches to a tall layout;
    - **Practise this section** → Turn on camera → Record → dance along with the corner video → Stop → Use this take →
-     ~10 s later you and the reference play side by side with skeletons. (Camera needs localhost or https; on a phone over
+     ~10 s later you and the reference play side by side with skeletons; the reference follows your moves along the
+     measured alignment (**Same time** switches to the clock), "Timing & sides" lists measured facts (late/early, pace,
+     mirrored, missed or untracked passages) and **See how moves were paired** opens the alignment view. (Camera needs localhost or https; on a phone over
      plain http use **Upload a video** instead.)
 
 ## Owner testing path (target)
