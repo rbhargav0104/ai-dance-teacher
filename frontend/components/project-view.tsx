@@ -4,13 +4,15 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ApiError, deleteProject, getMedia, getPoses, getProject, mediaHref, startAnalysis } from "@/lib/api";
+import { ApiError, chooseSubject, deleteProject, getMedia, getPoses, getProject, mediaHref, startAnalysis } from "@/lib/api";
 import { formatBytes, formatDuration, warningLabel } from "@/lib/media";
+import { followingSummary } from "@/lib/subject";
 import type { PosesResponse, Project } from "@/lib/types";
 
 import { AnalysisFailure, AnalysisProgress, TrackingSummary } from "./analysis-status";
 import { LearnStudio } from "./learn-studio";
 import { SkeletonOverlay } from "./skeleton-overlay";
+import { SubjectPicker } from "./subject-picker";
 
 import { StatusChip } from "./project-list";
 import { Panel } from "./studio-shell";
@@ -35,6 +37,7 @@ export function ProjectView() {
   const [starting, setStarting] = useState(false);
   const [poses, setPoses] = useState<PosesResponse | null>(null);
   const [showSkeleton, setShowSkeleton] = useState(true);
+  const [showPicker, setShowPicker] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const project = load.kind === "ok" ? load.project : null;
@@ -54,6 +57,8 @@ export function ProjectView() {
     },
     [id],
   );
+
+  const loadPeopleFrame = useCallback(async () => mediaHref((await getMedia(id, "people")).url), [id]);
 
   // Prefer the canonical copy (plays everywhere, matches the analysed timeline).
   const projectId = project?.id;
@@ -154,6 +159,32 @@ export function ProjectView() {
   const analysisOff = view.state !== "READY";
   const canStart =
     p.status === "uploaded" || (p.status === "failed" && (job?.retryable || RETRYABLE.has(p.error_code ?? "")));
+  const subject = ref?.subject ?? null;
+  const needsSubject =
+    Boolean(subject) && (p.status === "needs_subject" || (p.status === "failed" && p.error_code === "chosen_dancer_not_found"));
+  const following = followingSummary(subject);
+  const choose = async (person: number) => {
+    try {
+      await chooseSubject(p.id, person);
+      setShowPicker(false);
+    } finally {
+      // Refresh either way: in Limited mode the choice is stored even though analysis is refused.
+      getProject(p.id)
+        .then((fresh) => setLoad({ kind: "ok", project: fresh }))
+        .catch(() => {});
+    }
+  };
+  const picker = (variant: "stage" | "compact", onCancel?: () => void) =>
+    subject ? (
+      <SubjectPicker
+        subject={subject}
+        loadFrame={loadPeopleFrame}
+        onChoose={choose}
+        variant={variant}
+        onCancel={onCancel}
+        disabledReason={analysisOff ? "Analysis is off in Limited mode; your choice will be saved for later." : null}
+      />
+    ) : null;
   const overlay = analyzed && poses && hasCanonical && showSkeleton && src && !videoError;
   // Analysed dances open in Learn Mode: section player + editable timeline on the canonical copy.
   const learn = analyzed && hasCanonical && src !== null && !videoError;
@@ -198,6 +229,29 @@ export function ProjectView() {
           <AnalysisFailure project={p} />
           {analyzed && <TrackingSummary project={p} />}
 
+          {subject && !needsSubject && !busy && (
+            <div className="rounded-2xl border border-line p-4" data-testid="subject-following">
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">
+                {subject.candidates.length} people in this video
+              </p>
+              <p className="mt-1 text-sm text-ink">
+                {following ?? "Following the most prominent dancer. You can choose someone else."}
+              </p>
+              {showPicker ? (
+                <div className="mt-3">{picker("compact", () => setShowPicker(false))}</div>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="follow-someone-else"
+                  onClick={() => setShowPicker(true)}
+                  className="mt-3 inline-flex h-10 items-center rounded-full border border-line px-4 font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-ink transition hover:-translate-y-0.5 hover:border-lime/60"
+                >
+                  Follow someone else
+                </button>
+              )}
+            </div>
+          )}
+
           {analyzed ? (
             <div className="flex flex-col gap-3">
               {poses && !learn && (
@@ -228,7 +282,7 @@ export function ProjectView() {
                 Every joint, angle and confidence value measured from this video — the same data that drives the 3D avatar.
               </p>
             </div>
-          ) : busy ? null : p.status === "failed" && !canStart ? (
+          ) : busy || needsSubject ? null : p.status === "failed" && !canStart ? (
             <Link
               href="/studio"
               className="inline-flex h-14 w-full items-center justify-center rounded-full border border-lime/60 px-6 font-display text-sm font-semibold uppercase tracking-[0.12em] text-lime transition hover:-translate-y-0.5"
@@ -316,6 +370,9 @@ export function ProjectView() {
         />
       ) : (
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          {needsSubject ? (
+            <div className="self-start">{picker("stage")}</div>
+          ) : (
           <div className="relative self-start overflow-hidden rounded-3xl border border-line bg-black">
             {src && !videoError ? (
               <div className="relative aspect-video max-h-[70vh] w-full">
@@ -350,8 +407,8 @@ export function ProjectView() {
               </div>
             )}
           </div>
-  
-    <aside className="flex flex-col gap-6">{asideBody}</aside>
+          )}
+          <aside className="flex flex-col gap-6">{asideBody}</aside>
         </div>
       )}
     </Wrap>

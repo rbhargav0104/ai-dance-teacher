@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-27 ~15:30 IST (build session 7)_
+_Last updated: 2026-11-28 ~03:30 IST (build session 8)_
 
 ## Outcomes
 
@@ -12,14 +12,36 @@ _Last updated: 2026-11-27 ~15:30 IST (build session 7)_
 | 3 | Teachable sections | **tested** | Exit gate met (evidence below). Avatar retargeting maths started (`frontend/lib/avatar/retarget.ts`, unit-tested). |
 | 4 | Teacher Mode — **3D AI avatar teacher with voice** | **tested** | Exit gate (A1) met on desktop + iPhone 13 (evidence below), a day early. Unverified: real spoken audio (headless browsers have the API, not speakers) and GPU frame rate on real devices. Optional v2 skinned avatar not started. |
 | 5 | Learner capture + real learner pose | **tested** | Exit gate met (evidence below), ~1.5 days ahead of plan. Real webcam path verified with Chromium's fake camera fed real footage; a human webcam + phone camera not tried yet. |
-| 6 | Normalized alignment | **tested** | Exit gate met on real footage (evidence below). A2 (choose the dancer) not started — next session, before Outcome 7. |
+| 6 | Normalized alignment | **tested** | Exit gate met on real footage (evidence below). |
+| A2 | Choose the dancer (multi-person videos) | **tested** | Amendment exit gate met on real composited footage + Playwright desktop/mobile (evidence below). Scores follow automatically once Outcome 7 exists. |
 | 7 | Versioned scoring | planned | |
 | 8 | Actionable feedback | planned | |
 | 9 | Report, repeat, dashboard | planned | |
 | 10 | Production identity + durable infra | planned | |
 | 11 | Stable deployment + full acceptance | planned | |
 
-States: planned → implemented → tested → deployed. Ahead of the revised plan: Outcome 6 done Nov 27 pm (planned Nov 29). Next: amendment A2 (choose the dancer in multi-person videos), then Outcome 7 scoring.
+States: planned → implemented → tested → deployed. Ahead of the revised plan: Outcome 6 done Nov 27 pm (planned Nov 29). A2 (choose the dancer) done Nov 28 early. Next: Outcome 7 versioned scoring.
+
+### A2 exit gate — evidence ("pick the left dancer → everything follows the left dancer; re-run with the right; a crossing never switches silently")
+- *Real footage* (`tests/test_subject_choice.py`, real MediaPipe on `fixtures/multi/*`, identity checked on the video's own
+  pixels: girl = maroon top, boy = navy shirt, sampled under the followed torso in every checked frame):
+  two dancers → status `needs_subject` with 2 candidates (left/right, boxes apart, each followable in > 80 %), private
+  JPEG of the choosing frame, sections refused (409) until a choice; pick person 1 → analysed, every frame is the girl
+  (0 boy frames), sections tile the 8 s, "other people ignored" warning; same pick again → 200, no new job; pick person 2
+  → every frame is the boy, candidates unchanged. Swapped positions → "left" follows the boy. Girl vanishes 3–5.5 s →
+  those frames invalid and labelled lost, `chosen_dancer_lost` warning, 0 boy frames. Boy drifts across and hides the
+  girl → whichever person is followed, 0 frames of the other.
+- *Pure rules* (`tests/test_people.py`, 9 tests): overlapping second detection = same person; boxes/overlap; torso
+  histogram + distance; candidates numbered left→right; crossing keeps identity; leaving → masked, comes back after the gap;
+  look-alikes overlapping → never the wrong one; no appearance → only an unambiguous single body; re-locating the choice.
+- *API contract* (`tests/test_subject_api.py`): one person → 409; unknown person → 422 (nothing stored); foreign owner →
+  same 404; LIMITED → choice stored + 503 (status stays `needs_subject`); READY → 202 queued, same choice → same job,
+  different choice mid-job → 409.
+- *Browser* (`node scripts/e2e/choose-dancer.cjs`, also in CI): real duo upload → picker with the real frame, numbered
+  outlines and 3:4 crops → desktop picks left → Learn Mode "Following person 1 (left) for the whole video", 90/90 frames
+  on the left; iPhone 13 → **Follow someone else** → person 2 → 85/85 frames on the right; no console errors, no overflow.
+- Re-checks: Teacher Mode arm errors identical to before (girl median 2.2°/max 6.1°, boy max 27.9°); practice, learn-mode
+  and smoke browser checks pass.
 
 ### Outcome 6 exit gate — evidence ("scale/translation/speed tests behave as intended while wrong-limb, late and missing-movement tests remain distinguishable")
 - *Real footage* (`tests/test_alignment_api.py`, real MediaPipe on FFmpeg variants of the Mixkit clip; mean per-pair movement
@@ -112,6 +134,15 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 
 ## What exists today
 
+- **Choose the dancer (A2)**: up to 4 real detections per frame; overlapping duplicates merged. When several people are
+  visible for more than 20 % of a reference or attempt, analysis stops at **"Who should we follow?"**: the clearest real
+  frame with each person outlined and numbered, a 3:4 crop of each, where they are and how much of the video they're in.
+  Tap one → the real analysis re-runs following only that person (position + torso-colour identity); frames where they're
+  lost or can't be told apart are masked and labelled ("Lost the dancer you chose here" on the avatar), never filled with
+  someone else. The dance/attempt page shows whom it follows and offers **Follow someone else**. API:
+  `POST /api/projects/{id}/subject`, `POST /api/practice-sessions/{id}/subject`, media kind `people`; `subject` on
+  reference/attempt responses; per-frame `subject` status in poses. Migration 0007.
+
 - **Alignment (Outcome 6)**: `GET /api/practice-sessions/{id}/alignment` aligns an analysed attempt to its reference window
   (`app/pose/alignment.py`, `align-1`): hip-centred torso-scaled shape + a global limb-ratio body-size factor; per pair a
   translation + bounded (±15 %) scale fit; cost = position (depth ×0.3, worst-3-joint focus) + joint angles + lean + motion
@@ -180,6 +211,13 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 - **CI** (`.github/workflows/ci.yml`): backend ruff + mypy strict + pytest (incl. real model load) + pose smoke;
   frontend eslint + tsc + vitest + build; end-to-end boot smoke.
 
+## Verified claims — session 8 (2026-11-28 early)
+
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → see RUN_LOG.
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 91 passed.
+- Built web + API (READY): `scripts/smoke.sh` → SMOKE OK; `node scripts/e2e/choose-dancer.cjs` → CHOOSE DANCER CHECK OK;
+  `teacher-mode.cjs`, `practice.cjs`, `learn-mode.cjs` → OK. Picker screenshots reviewed (desktop + iPhone 13).
+
 ## Verified claims — session 7 (2026-11-27 pm)
 
 - `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → see RUN_LOG (full suite).
@@ -244,10 +282,11 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 - Alignment: cost coefficients are calibrated on one reference clip (cropped at the hips) + its variants; smaller figures
   read as more different because the pose model measures them less precisely. A section attempt is expected to start with
   the section (the band is anchored at the recording's start). Re-check with more fixtures at Outcome 7.
-- A2 (choose the dancer in multi-person videos) not started; multi-person clips still fail `multiple_people`.
-- Quality gate weakness: a grey band over only the dancer's hips made MediaPipe report two people on the CI runner,
-  so that clip failed as `multiple_people` (misleading — there is one dancer). Fixture changed to a full-view block;
-  the gate should ignore second detections overlapping the main dancer (Outcome 7 calibration).
+- A2: people are told apart by torso colour; two people dressed alike who also overlap are masked rather than
+  separated. Candidates come from one frame (the clearest with everyone apart) — someone who only appears at other
+  times isn't offered. Picking re-runs MediaPipe (~10 s for a short clip) instead of reusing cached detections.
+  Re-choosing a reference regenerates its automatic sections (manual section edits are lost). Practice-attempt picker
+  is API-tested and uses the same component, but the browser check covers the reference page only.
 - Torso scale measured 0.48× (not 0.6×) on the 60%-scaled variant (hips on the frame edge) — handled in alignment by the
   limb-ratio body-size factor and per-pair scale fit.
 
@@ -290,7 +329,10 @@ The one-click Codespaces path lands on Dec 3. Until then:
    - **Practise this section** → Turn on camera → Record → dance along with the corner video → Stop → Use this take →
      ~10 s later you and the reference play side by side with skeletons; the reference follows your moves along the
      measured alignment (**Same time** switches to the clock), "Timing & sides" lists measured facts (late/early, pace,
-     mirrored, missed or untracked passages) and **See how moves were paired** opens the alignment view. (Camera needs localhost or https; on a phone over
+     mirrored, missed or untracked passages) and **See how moves were paired** opens the alignment view.
+   - **Two dancers**: upload `fixtures/multi/duo_girl_left.mp4` from the repo → **Analyze Choreography** → "Who should we
+     follow?" → tap either dancer → ~10 s later the avatar and sections follow only that person; **Follow someone else**
+     switches. (Camera needs localhost or https; on a phone over
      plain http use **Upload a video** instead.)
 
 ## Owner testing path (target)

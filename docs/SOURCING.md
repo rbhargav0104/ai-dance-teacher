@@ -93,3 +93,8 @@ A denied permission is simulated with `--use-fake-ui-for-media-stream=deny` (pla
 
 ## Learner-attempt fixtures — status (2026-11-27)
 Generated and committed: `fixtures/attempts/` (9 variants, 3.1 MB) by `scripts/make_attempt_fixtures.py`; see the manifest.
+
+## Multi-person fixtures (A2, added 2026-11-28)
+Generated and committed: `fixtures/multi/` (4 composites, 1.9 MB) by `scripts/make_multi_person_fixtures.py` from the two
+committed Mixkit clips (shared green backdrop → side by side, swapped, one dancer leaving, chroma-keyed crossing).
+Used by `backend/tests/test_subject_choice.py` and `scripts/e2e/choose-dancer.cjs`.

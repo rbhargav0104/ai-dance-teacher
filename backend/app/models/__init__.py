@@ -98,6 +98,8 @@ class ReferenceVideo(Base):
     canonical_duration: Mapped[float | None] = mapped_column(Float)
     quality: Mapped[dict[str, Any] | None] = mapped_column(JsonType)
     analyzed_at: Mapped[datetime | None] = mapped_column()
+    # Who is in the video + whom to follow (migration 0007, spec amendment A2).
+    subject: Mapped[dict[str, Any] | None] = mapped_column(JsonType)
     warnings: Mapped[list[str]] = mapped_column(JsonType, default=list)
     pipeline_version: Mapped[str | None] = mapped_column(String(64))
     model_version: Mapped[str | None] = mapped_column(String(128))
@@ -194,6 +196,8 @@ class PracticeSession(Base):
     pipeline_version: Mapped[str | None] = mapped_column(String(64))
     model_version: Mapped[str | None] = mapped_column(String(128))
     analyzed_at: Mapped[datetime | None] = mapped_column()
+    # Who is in the video + whom to follow (migration 0007, spec amendment A2).
+    subject: Mapped[dict[str, Any] | None] = mapped_column(JsonType)
     # Cached comparison alignment (migration 0006), valid only for `alignment_key`.
     alignment: Mapped[dict[str, Any] | None] = mapped_column(JsonType)
     alignment_key: Mapped[str | None] = mapped_column(String(255))

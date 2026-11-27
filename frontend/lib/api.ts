@@ -134,6 +134,13 @@ export const startAnalysis = (id: string, rerun = false) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rerun }),
   });
+/** Choose whom to follow in a multi-person video (A2); re-runs the real analysis. */
+export const chooseSubject = (id: string, person: number) =>
+  authed<JobInfo>(`/api/projects/${encodeURIComponent(id)}/subject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ person }),
+  });
 export const getPoses = (id: string) =>
   authed<PosesResponse>(`/api/projects/${encodeURIComponent(id)}/poses`);
 const sectionsPath = (id: string) => `/api/projects/${encodeURIComponent(id)}/segments`;
@@ -312,6 +319,12 @@ export const startPracticeAnalysis = (id: string, rerun = false) =>
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rerun }),
+  });
+export const choosePracticeSubject = (id: string, person: number) =>
+  authed<JobInfo>(`${practicePath(id)}/subject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ person }),
   });
 export const getPracticePoses = (id: string) => authed<PosesResponse>(`${practicePath(id)}/poses`);
 export const getPracticeAlignment = (id: string) => authed<AlignmentResponse>(`${practicePath(id)}/alignment`);

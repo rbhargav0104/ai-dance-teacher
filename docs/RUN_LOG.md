@@ -227,3 +227,40 @@ no silent identity switch, overlapping-detection fix), then Outcome 7 versioned 
 - CI run 45970269449 (ecf4e5d) on `build` → **green** (backend incl. real-footage alignment tests, frontend, smoke incl.
   Teacher Mode + Practice browser checks with alignment, LIMITED smoke). `main` fast-forwarded to ecf4e5d.
   This run-log line is on `build` only; the next session ships it to `main` with its own green run.
+
+## Session 8 — 2026-11-28 01:44–03:40 IST (spec amendment A2: choose the dancer)
+
+Start: `add_repo` not offered; repo already cloned with push access. `origin/build` (4ed1d08, run-log commit, CI green
+run 45972265923) was ahead of `main`; work continued from it. Outcome 6 gate re-checked by the full backend suite below
+(alignment tests on real footage included).
+
+Delivered:
+- `backend/app/pose/people.py` (`people-1`): body boxes, same-person merge of overlapping detections, torso colour
+  histogram per detection, identity-aware follower (position + appearance, masks lost/uncertain frames, appearance-only
+  reacquire), survey of candidates (clearest frame with everyone apart, numbered left→right, share followable),
+  re-locating a stored choice.
+- Extraction: up to 4 poses per frame + appearance per detection. `pipeline/common.measure` follows a stored choice,
+  otherwise the main dancer; `needs_choice` when > 20 % of frames show several distinct people; per-frame
+  `subject` status; stored `subject` record + private choosing frame (`people.jpg`). Worker: `SubjectChoiceNeeded` →
+  status `needs_subject`. Quality: `other_people_ignored`, `chosen_dancer_lost` warnings. Migration 0007.
+- API: `POST /api/projects/{id}/subject`, `POST /api/practice-sessions/{id}/subject`, media kind `people`, `subject` in
+  reference/attempt responses.
+- Frontend: `SubjectPicker` (real frame, numbered outlines, 3:4 crops, share, current choice, errors/LIMITED),
+  dance page + attempt page integration ("Who should we follow?", "Following person N", **Follow someone else**),
+  avatar "Lost the dancer you chose here", status labels; `lib/subject.ts` + tests.
+- Fixtures: `scripts/make_multi_person_fixtures.py` → `fixtures/multi/` (duo_girl_left, duo_boy_left, duo_girl_leaves,
+  crossing; 1.9 MB) + manifest + LICENSES.
+- `scripts/e2e/choose-dancer.cjs` + CI step.
+
+Commands and results:
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 235 passed
+  (new: 9 people rules, 2 subject API, 4 real-footage subject choice; two old multi-person tests now expect the picker).
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 91 passed.
+- Built web + API (READY): `scripts/smoke.sh` → SMOKE OK; `node scripts/e2e/choose-dancer.cjs` → CHOOSE DANCER CHECK OK
+  (left 90/90 frames left, right 85/85 frames right); `teacher-mode.cjs` → OK (same arm errors as before: girl median
+  2.2° max 6.1°, boy max 27.9°); `practice.cjs` → PRACTICE CHECK OK; `learn-mode.cjs` → OK.
+
+Found during the run: position-only following handed the chosen person to the other dancer whenever they were missed
+for a frame (the only remaining detection was "near enough"); appearance is now required whenever it is measurable.
+
+Next: Outcome 7 — versioned scoring on top of `align-1` (confidence/coverage rules, golden-fixture relationship tests).

@@ -197,5 +197,79 @@
       "license": "Mixkit Free License",
       "generated_by": "scripts/make_attempt_fixtures.py"
     }
+  ],
+  "multi_person": [
+    {
+      "id": "duo_girl_left",
+      "file": "multi/duo_girl_left.mp4",
+      "derived_from": [
+        "mixkit_girl_earphones_28306",
+        "mixkit_boy_funny_28289"
+      ],
+      "sha256": "119634d29bedfcbe7d0548c10859483a00f8262a1e11280d6b921e9457cf8c62",
+      "bytes": 474914,
+      "width": 640,
+      "height": 360,
+      "duration": 8.0,
+      "fps": 24,
+      "transform": "ffmpeg -i mixkit_girl_earphones_28306.mp4 -i mixkit_boy_funny_28289.mp4 -filter_complex \"[0:v]scale=640:360,crop=320:360:130:0[g];[1:v]scale=640:360,crop=320:360:160:0[b];[g][b]hstack,fps=24[v]\" -map [v] -t 8 -an -c:v libx264 -preset medium -crf 28 -pix_fmt yuv420p -threads 1 -movflags +faststart -map_metadata -1 duo_girl_left.mp4",
+      "expected_relationship": "two real dancers side by side for the whole clip (girl left, boy right): analysis must stop at 'Who should we follow?' with two candidates; following the left person must reproduce the girl's movement, the right person the boy's.",
+      "license": "Mixkit Free License",
+      "generated_by": "scripts/make_multi_person_fixtures.py"
+    },
+    {
+      "id": "duo_boy_left",
+      "file": "multi/duo_boy_left.mp4",
+      "derived_from": [
+        "mixkit_girl_earphones_28306",
+        "mixkit_boy_funny_28289"
+      ],
+      "sha256": "1d4a7e88cf114d95bd4a5b205e8e0a61ab6cbd1585dca8ace9cf3c5f76a1443e",
+      "bytes": 475694,
+      "width": 640,
+      "height": 360,
+      "duration": 8.0,
+      "fps": 24,
+      "transform": "ffmpeg -i mixkit_girl_earphones_28306.mp4 -i mixkit_boy_funny_28289.mp4 -filter_complex \"[0:v]scale=640:360,crop=320:360:130:0[g];[1:v]scale=640:360,crop=320:360:160:0[b];[b][g]hstack,fps=24[v]\" -map [v] -t 8 -an -c:v libx264 -preset medium -crf 28 -pix_fmt yuv420p -threads 1 -movflags +faststart -map_metadata -1 duo_boy_left.mp4",
+      "expected_relationship": "the same two dancers with positions swapped (boy left, girl right): the left choice must now follow the boy.",
+      "license": "Mixkit Free License",
+      "generated_by": "scripts/make_multi_person_fixtures.py"
+    },
+    {
+      "id": "duo_girl_leaves",
+      "file": "multi/duo_girl_leaves.mp4",
+      "derived_from": [
+        "mixkit_girl_earphones_28306",
+        "mixkit_boy_funny_28289"
+      ],
+      "sha256": "f451dee43b475cf5a31db69d05278892db4981f927f0825ccc990aea2a0ef371",
+      "bytes": 408272,
+      "width": 640,
+      "height": 360,
+      "duration": 8.0,
+      "fps": 24,
+      "transform": "ffmpeg -i mixkit_girl_earphones_28306.mp4 -i mixkit_boy_funny_28289.mp4 -filter_complex \"[0:v]scale=640:360,crop=320:360:130:0[g];[1:v]scale=640:360,crop=320:360:160:0[b];[g][b]hstack,fps=24,drawbox=x=0:y=0:w=320:h=360:color=0x6ef711@1:t=fill:enable='between(t,3,5.5)'[v]\" -map [v] -t 8 -an -c:v libx264 -preset medium -crf 28 -pix_fmt yuv420p -threads 1 -movflags +faststart -map_metadata -1 duo_girl_leaves.mp4",
+      "expected_relationship": "side by side, but the girl (left) vanishes from 3 s to 5.5 s while the boy keeps dancing: following the girl must mask 3-5.5 s ('lost the dancer you chose'), never switch to the boy.",
+      "license": "Mixkit Free License",
+      "generated_by": "scripts/make_multi_person_fixtures.py"
+    },
+    {
+      "id": "crossing",
+      "file": "multi/crossing.mp4",
+      "derived_from": [
+        "mixkit_girl_earphones_28306",
+        "mixkit_boy_funny_28289"
+      ],
+      "sha256": "59d53a089e4209fd3188b9af749a80b3ee44d151d3315631dda887e285a06ac6",
+      "bytes": 526129,
+      "width": 640,
+      "height": 360,
+      "duration": 10.0,
+      "fps": 24,
+      "transform": "ffmpeg -i mixkit_girl_earphones_28306.mp4 -i mixkit_boy_funny_28289.mp4 -filter_complex \"[0:v]scale=640:360,fps=24[bg];[1:v]scale=640:360,fps=24,chromakey=0x6ef711:0.18:0.08[fg];[bg][fg]overlay=x='-220+t*46':y=0:shortest=1[v]\" -map [v] -t 10 -an -c:v libx264 -preset medium -crf 28 -pix_fmt yuv420p -threads 1 -movflags +faststart -map_metadata -1 crossing.mp4",
+      "expected_relationship": "the boy (chroma-keyed, in front) drifts from the left edge to the right across the girl (behind) and covers her around 3-6 s: whoever is followed is kept or masked while they overlap, never silently swapped.",
+      "license": "Mixkit Free License",
+      "generated_by": "scripts/make_multi_person_fixtures.py"
+    }
   ]
 }

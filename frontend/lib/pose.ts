@@ -86,6 +86,7 @@ export function stageLabel(stage: string | null | undefined): string {
 }
 
 export const FAILURE_HELP: Record<string, string> = {
+  chosen_dancer_not_found: "Pick the person again from the people we found.",
   multiple_people: "Trim or crop the video so only one dancer is visible, then upload it again.",
   low_coverage: "Record again with your whole body in frame, steady light and nothing blocking the view.",
   no_dancer_detected: "Use a clip where one person's shoulders and hips are clearly visible.",

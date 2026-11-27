@@ -62,6 +62,8 @@ const WARNINGS: Record<string, string> = {
   cropped_body: "Feet are out of frame — leg and footwork detail is limited",
   low_tracking_confidence: "Tracking confidence is low — joint measurements may be noisy",
   brief_extra_person: "Another person appears briefly — we followed the main dancer",
+  other_people_ignored: "Other people in the video are ignored — we follow the person you chose",
+  chosen_dancer_lost: "We lost the person you chose for part of the video — those moments are left out",
 };
 
 export const warningLabel = (code: string) => WARNINGS[code] ?? code.replaceAll("_", " ");
@@ -79,6 +81,8 @@ export function projectStatusLabel(status: string): { label: string; tone: "lime
       return { label: "Pose tracked", tone: "lime" };
     case "ready":
       return { label: "Ready to learn", tone: "lime" };
+    case "needs_subject":
+      return { label: "Choose who to follow", tone: "amber" };
     case "failed":
       return { label: "Needs attention", tone: "danger" };
     default:

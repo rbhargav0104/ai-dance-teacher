@@ -48,6 +48,7 @@ from app.services.practice import (
     resolve_segment,
     target_duration,
 )
+from app.services.subjects import SubjectOut, subject_out
 from app.storage import get_storage
 
 router = APIRouter(tags=["practice"])
@@ -92,6 +93,7 @@ class PracticeOut(BaseModel):
     analyzed_at: datetime | None
     created_at: datetime
     latest_job: JobOut | None
+    subject: SubjectOut | None = None  # who is in the attempt and whom we follow (A2)
     # Comparison and scoring arrive in Outcomes 6-7; nothing here is a dance score.
     scored: bool = False
 
@@ -143,6 +145,7 @@ def to_out(db: Session, practice: PracticeSession) -> PracticeOut:
         analyzed_at=practice.analyzed_at,
         created_at=practice.created_at,
         latest_job=job_out(job) if job else None,
+        subject=subject_out(practice.subject),
     )
 
 
@@ -382,6 +385,7 @@ def practice_media_url(
         "source": practice.source_object_key,
         "canonical": practice.canonical_object_key,
         "poster": practice.thumbnail_key,
+        "people": (practice.subject or {}).get("frame_key"),
     }[kind]
     if key is None:
         raise ApiError(404, "media_not_found", "This video isn't available yet.")

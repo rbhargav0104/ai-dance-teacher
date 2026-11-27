@@ -200,6 +200,7 @@ export function LearnStudio({
   }, []);
 
   const tracks = useMemo(() => (poses ? { direct: buildTrack(poses, false), mirror: buildTrack(poses, true) } : null), [poses]);
+  const chosenDancer = useMemo(() => Boolean(poses?.frames.some((f) => f.data.subject)), [poses]);
   const avatarOn = Boolean(tracks && webgl);
   const avatarPrimary = avatarOn && primary === "avatar";
 
@@ -407,6 +408,7 @@ export function LearnStudio({
                 reducedMotion={reducedMotion}
                 compact={primary !== "avatar"}
                 fallback={<StageFallback />}
+                chosenDancer={chosenDancer}
               />
             </div>
           )}

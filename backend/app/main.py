@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from app import __version__
-from app.api import health, media, practice, projects, sections, session
+from app.api import health, media, practice, projects, sections, session, subjects
 from app.config import get_settings
 from app.errors import install_error_handlers
 from app.logging_setup import configure_logging, install_request_logging
@@ -60,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(media.router)
     app.include_router(sections.router)
     app.include_router(practice.router)
+    app.include_router(subjects.router)
     return app
 
 

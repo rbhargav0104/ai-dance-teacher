@@ -125,6 +125,8 @@ export const PRACTICE_WARNINGS: Record<string, string> = {
   cropped_body: "Your feet were out of frame for most of the attempt; leg and footwork detail is limited.",
   low_tracking_confidence: "Tracking confidence was low; joint measurements may be noisy.",
   brief_extra_person: "Someone else appeared briefly; we followed you.",
+  other_people_ignored: "Other people in the video are ignored; we follow the person you chose.",
+  chosen_dancer_lost: "We lost the person you chose for part of the attempt; those moments are left out.",
   portrait: "Recorded in portrait.",
   low_frame_rate: "Low frame rate — fast moves may be missed.",
   low_resolution: "Low resolution — small joints may be less precise.",
@@ -141,6 +143,8 @@ export function practiceStatusLabel(p: PracticeSession): string {
       return "Analysing";
     case "analyzed":
       return "Pose measured";
+    case "needs_subject":
+      return "Choose who to follow";
     case "failed":
       return "Needs a re-record";
     default:

@@ -1,9 +1,10 @@
 """Real MediaPipe Pose Landmarker inference over a canonical video (spec section 12).
 
 Frames are decoded by FFmpeg at the analysis rate (default 12 fps from the 24 fps canonical
-copy) and fed to the landmarker in VIDEO mode with their real timestamps. Up to two poses are
-requested per frame so that a second person is *detected* (and can fail the multi-person gate)
-instead of being silently ignored.
+copy) and fed to the landmarker in VIDEO mode with their real timestamps. Up to four poses are
+requested per frame so that other people are *detected* (and the user can choose whom to follow,
+spec amendment A2) instead of being silently ignored. For each detection a torso colour
+histogram is measured on the same frame, so the chosen person can be told apart from others.
 """
 
 from __future__ import annotations
@@ -19,10 +20,13 @@ from numpy.typing import NDArray
 
 from app.media.transcode import CANONICAL_FPS
 from app.pose import landmarks as L
+from app.pose.people import appearance_of
 
 FloatArray = NDArray[np.float64]
 
 ProgressFn = Callable[[float], None]
+
+MAX_POSES = 4
 
 
 class ExtractionFailed(Exception):
@@ -38,6 +42,7 @@ class RawExtraction:
     frame_numbers: NDArray[np.int64]  # canonical (24 fps) frame index
     detections: list[list[FloatArray]]  # per frame: list of (33,5) arrays
     world: list[list[FloatArray]]  # per frame: list of (33,3) world landmarks (metres, hip-origin)
+    appearances: list[list[FloatArray | None]]  # per frame/detection: torso colour histogram
     analysis_fps: float
 
 
@@ -84,7 +89,7 @@ def extract(
     options = PoseLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=str(model_path)),
         running_mode=RunningMode.VIDEO,
-        num_poses=2,
+        num_poses=MAX_POSES,
         min_pose_detection_confidence=0.5,
         min_pose_presence_confidence=0.5,
         min_tracking_confidence=0.5,
@@ -111,6 +116,7 @@ def extract(
     frames: list[int] = []
     detections: list[list[FloatArray]] = []
     world: list[list[FloatArray]] = []
+    appearances: list[list[FloatArray | None]] = []
 
     proc = subprocess.Popen(  # noqa: S603 - fixed argv; path is server-generated
         args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
@@ -127,7 +133,9 @@ def extract(
                 rgb = np.frombuffer(buf, dtype=np.uint8).reshape(height, width, 3)
                 image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(rgb))
                 result = landmarker.detect_for_video(image, int(round(t * 1000)))
-                detections.append([_pose_array(p) for p in result.pose_landmarks])
+                poses = [_pose_array(p) for p in result.pose_landmarks]
+                detections.append(poses)
+                appearances.append([appearance_of(rgb, p) for p in poses])
                 world.append([_world_array(p) for p in (result.pose_world_landmarks or [])])
                 times.append(t)
                 frames.append(int(round(t * CANONICAL_FPS)))
@@ -150,5 +158,6 @@ def extract(
         frame_numbers=np.asarray(frames, dtype=np.int64),
         detections=detections,
         world=world,
+        appearances=appearances,
         analysis_fps=analysis_fps,
     )

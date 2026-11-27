@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   ApiError,
+  choosePracticeSubject,
   deletePractice,
   getMedia,
   getPoses,
@@ -27,11 +28,13 @@ import {
   referenceTimeFor,
   reviewLength,
 } from "@/lib/practice";
+import { followingSummary } from "@/lib/subject";
 import type { Alignment, PosesResponse, PracticeSession } from "@/lib/types";
 
 import { ProgressRing } from "./analysis-status";
 import { AttemptChip } from "./practice-studio";
 import { SkeletonOverlay } from "./skeleton-overlay";
+import { SubjectPicker } from "./subject-picker";
 import { Panel } from "./studio-shell";
 import { useStudioStatus } from "./studio-status";
 
@@ -47,6 +50,8 @@ export function AttemptReview() {
   const [load, setLoad] = useState<Load>({ kind: "pending" });
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const loadPeopleFrame = useCallback(async () => mediaHref((await getPracticeMedia(sid, "people")).url), [sid]);
 
   const fetchAttempt = useCallback(
     () =>
@@ -108,6 +113,29 @@ export function AttemptReview() {
 
   const a = load.attempt;
   const practiceHref = `/studio/projects/${a.project_id}/practice${a.target.segment_id ? `?section=${encodeURIComponent(a.target.segment_id)}` : ""}`;
+  const subject = a.subject ?? null;
+  const needsSubject =
+    Boolean(subject) && (a.status === "needs_subject" || (a.status === "failed" && a.error_code === "chosen_dancer_not_found"));
+  const following = followingSummary(subject);
+  const choose = async (person: number) => {
+    try {
+      await choosePracticeSubject(a.id, person);
+      setShowPicker(false);
+    } finally {
+      void fetchAttempt();
+    }
+  };
+  const picker = (variant: "stage" | "compact", onCancel?: () => void) =>
+    subject ? (
+      <SubjectPicker
+        subject={subject}
+        loadFrame={loadPeopleFrame}
+        onChoose={choose}
+        variant={variant}
+        onCancel={onCancel}
+        disabledReason={view.state === "READY" ? null : "Analysis is off in Limited mode; your choice will be saved for later."}
+      />
+    ) : null;
 
   return (
     <Wrap projectId={a.project_id}>
@@ -121,7 +149,9 @@ export function AttemptReview() {
         Your attempt <span className="text-muted">·</span> <span className="text-lime">{a.target.title}</span>
       </h1>
 
-      {a.status === "analyzed" ? (
+      {needsSubject ? (
+        <div className="mt-8">{picker("stage")}</div>
+      ) : a.status === "analyzed" ? (
         <SideBySide attempt={a} />
       ) : busy ? (
         <div className="mt-8 flex items-center gap-4 rounded-3xl border border-lime/30 bg-lime/5 p-6" role="status" aria-live="polite" data-testid="attempt-progress">
@@ -158,6 +188,29 @@ export function AttemptReview() {
               : "This attempt hasn't been analysed yet."}
           </p>
           {view.state === "READY" && <RetryButton id={a.id} onDone={fetchAttempt} setNotice={setNotice} label="Analyse now" />}
+        </div>
+      )}
+      {subject && !needsSubject && !busy && (
+        <div className="mt-6 rounded-2xl border border-line p-4" data-testid="subject-following">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="mr-auto text-sm text-ink">
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">
+                {subject.candidates.length} people in this video ·{" "}
+              </span>
+              {following ?? "Following the most prominent person. You can choose someone else."}
+            </p>
+            {!showPicker && (
+              <button
+                type="button"
+                data-testid="follow-someone-else"
+                onClick={() => setShowPicker(true)}
+                className="inline-flex h-10 items-center rounded-full border border-line px-4 font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-ink transition hover:-translate-y-0.5 hover:border-lime/60"
+              >
+                Follow someone else
+              </button>
+            )}
+          </div>
+          {showPicker && <div className="mt-3">{picker("compact", () => setShowPicker(false))}</div>}
         </div>
       )}
       {notice && (

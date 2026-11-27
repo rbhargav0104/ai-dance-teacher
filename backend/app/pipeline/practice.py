@@ -21,8 +21,10 @@ from app.pipeline.common import (
     measure,
     prepare,
     quality_dict,
+    raise_if_choice_needed,
     require_runtime,
     span,
+    subject_record,
 )
 from app.pipeline.errors import AnalysisFailed
 from app.pose.quality import WARNING_MESSAGES
@@ -71,7 +73,20 @@ def run_practice_analysis(
         db.commit()
         progress("preparing", 0.15)
 
-        measured = measure(prepared, settings, span(0.15, 0.9, progress, "tracking"))
+        measured = measure(
+            prepared,
+            settings,
+            span(0.15, 0.9, progress, "tracking"),
+            choice=(practice.subject or {}).get("choice"),
+        )
+        subject = subject_record(
+            measured,
+            prepared.canonical,
+            Path(tmp),
+            storage,
+            f"{prefix}/people.jpg",
+            practice.subject,
+        )
 
     report = measured.report
     progress("saving", 0.92)
@@ -92,6 +107,7 @@ def run_practice_analysis(
     db.add_all(rows)
     kept = [w for w in (practice.warnings or []) if w not in WARNING_MESSAGES]
     practice.analysis_fps = measured.raw.analysis_fps
+    practice.subject = subject
     practice.tracking_coverage = round(report.coverage, 4)
     practice.warnings = kept + report.warnings
     practice.quality = quality_dict(measured)
@@ -101,6 +117,7 @@ def run_practice_analysis(
     db.commit()
     progress("saving", 0.99)
 
+    raise_if_choice_needed(measured)
     if report.failure is not None:
         raise AnalysisFailed(report.failure, report.failure_message or report.failure)
     return PracticeOutcome(report.coverage, report.warnings, len(rows))

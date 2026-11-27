@@ -27,3 +27,10 @@ download as stock footage.
   60% size + shifted, +0.4 s late, 0.9x / 1.1x speed, mirrored, middle replaced by a 4 s hold, view fully blocked 5–8 s,
   and the other dance as a wrong-dance attempt. Exact commands, SHA-256 and the expected relationship of each
   variant are in `fixture_manifest.json` → `attempts`. No landmarks are fabricated: each is a real video.
+
+## multi/*.mp4 (multi-person fixtures, spec amendment A2)
+- Composited from the same two Mixkit clips (same Mixkit Free License, credit: video by Mixkit) with FFmpeg by
+  `scripts/make_multi_person_fixtures.py`: 640x360, 24 fps, H.264 CRF 28, no audio, 8–10 s. Both clips share one green
+  backdrop, so they can be placed side by side (`duo_girl_left`, `duo_boy_left`), have one dancer vanish for 2.5 s
+  (`duo_girl_leaves`), or chroma-key the boy so he drifts across the girl (`crossing`). Commands, SHA-256 and expected
+  behaviour are in `fixture_manifest.json` → `multi_person`. No landmarks are fabricated.

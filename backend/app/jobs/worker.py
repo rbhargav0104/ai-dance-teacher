@@ -19,7 +19,7 @@ from app.config import Settings, get_settings
 from app.db.session import get_sessionmaker
 from app.jobs import queue
 from app.models import AnalysisJob, DanceProject, PracticeSession
-from app.pipeline.errors import AnalysisFailed
+from app.pipeline.errors import AnalysisFailed, SubjectChoiceNeeded
 from app.services.intake import project_prefix
 from app.services.practice import practice_prefix
 from app.storage import get_storage
@@ -137,6 +137,25 @@ class Worker:
                 db.rollback()
                 self._cleanup_if_deleted(project_id, owner_id, practice_id)
                 log.info("job_lost", extra={"job_id": job_id})
+            except SubjectChoiceNeeded as exc:
+                # Several people: wait for the user to choose whom to follow (A2).
+                db.rollback()
+                try:
+                    queue.finish(
+                        db,
+                        job_id,
+                        self.worker_id,
+                        status="failed",
+                        message=exc.message,
+                        error_code=exc.code,
+                        retryable=False,
+                        project_status="needs_subject",
+                        project_error=exc.message,
+                    )
+                    log.info("job_needs_subject", extra={"job_id": job_id})
+                except queue.JobLost:
+                    pass
+                self._cleanup_if_deleted(project_id, owner_id, practice_id)
             except AnalysisFailed as exc:
                 db.rollback()
                 self._safe_finish_failed(db, job_id, exc.code, exc.message, exc.retryable)

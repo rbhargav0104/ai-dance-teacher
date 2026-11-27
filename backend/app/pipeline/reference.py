@@ -21,8 +21,10 @@ from app.pipeline.common import (
     measure,
     prepare,
     quality_dict,
+    raise_if_choice_needed,
     require_runtime,
     span,
+    subject_record,
 )
 from app.pipeline.errors import AnalysisFailed
 from app.pose.quality import WARNING_MESSAGES
@@ -76,7 +78,20 @@ def run_reference_analysis(
         progress("preparing", 0.15)
 
         # --- tracking: real MediaPipe inference --------------------------------------------
-        measured = measure(prepared, settings, span(0.15, 0.85, progress, "tracking"))
+        measured = measure(
+            prepared,
+            settings,
+            span(0.15, 0.85, progress, "tracking"),
+            choice=(ref.subject or {}).get("choice"),
+        )
+        subject = subject_record(
+            measured,
+            prepared.canonical,
+            Path(tmp),
+            storage,
+            f"{prefix}/people.jpg",
+            ref.subject,
+        )
 
     report = measured.report
     progress("saving", 0.88)
@@ -99,6 +114,7 @@ def run_reference_analysis(
     db.add_all(rows)
     intake_warnings = [w for w in (ref.warnings or []) if w not in WARNING_MESSAGES]
     ref.analysis_fps = measured.raw.analysis_fps
+    ref.subject = subject
     ref.pose_coverage = round(report.coverage, 4)
     ref.warnings = intake_warnings + report.warnings
     ref.quality = quality_dict(measured)
@@ -108,6 +124,7 @@ def run_reference_analysis(
     db.commit()
     progress("saving", 0.98)
 
+    raise_if_choice_needed(measured)
     if report.failure is not None:
         raise AnalysisFailed(report.failure, report.failure_message or report.failure)
 

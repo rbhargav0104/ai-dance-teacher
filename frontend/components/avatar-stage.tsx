@@ -71,6 +71,7 @@ export function AvatarStage({
   compact = false,
   onStatus,
   fallback,
+  chosenDancer = false,
 }: {
   track: AvatarTrack;
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -79,6 +80,8 @@ export function AvatarStage({
   compact?: boolean;
   onStatus?: (s: SampleStatus) => void;
   fallback: ReactNode;
+  /** The video has several people and the analysis follows the one the user chose (A2). */
+  chosenDancer?: boolean;
 }) {
   const [status, setStatus] = useState<SampleStatus>("tracked");
   const parts = useMemo(() => untrackedParts(track.rig), [track]);
@@ -118,8 +121,14 @@ export function AvatarStage({
         {status === "lost" && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center" data-testid="avatar-lost">
             <p className="rounded-2xl border border-amber/50 bg-studio/85 px-4 py-2 text-center text-sm text-amber backdrop-blur">
-              Tracking lost here
-              {!compact && <span className="block text-xs text-muted">The dancer wasn&apos;t measured at this moment. Watch the video.</span>}
+              {chosenDancer ? "Lost the dancer you chose here" : "Tracking lost here"}
+              {!compact && (
+                <span className="block text-xs text-muted">
+                  {chosenDancer
+                    ? "We never switch to someone else, so this moment is left out. Watch the video."
+                    : "The dancer wasn't measured at this moment. Watch the video."}
+                </span>
+              )}
             </p>
           </div>
         )}

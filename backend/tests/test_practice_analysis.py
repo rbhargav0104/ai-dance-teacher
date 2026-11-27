@@ -173,8 +173,10 @@ def test_wrong_dancer_count_fails_honestly_and_delete_while_queued(
     assert run_jobs() == 1  # the deleted attempt's job went with it
 
     failed = real.get(f"/api/practice-sessions/{duo_id}", headers=auth).json()
-    assert failed["status"] == "failed" and failed["error_code"] == "multiple_people"
+    # A2: two people → "Who should we follow?" instead of a failure.
+    assert failed["status"] == "needs_subject" and failed["error_code"] == "choose_dancer"
     assert failed["latest_job"]["retryable"] is False
+    assert len(failed["subject"]["candidates"]) == 2
     q = real.get(f"/api/practice-sessions/{duo_id}/poses", headers=auth).json()
     assert q["quality"]["multi_person_fraction"] > 0.2  # still inspectable
     assert real.get(f"/api/projects/{pid}", headers=auth).json()["status"] == "analyzed"

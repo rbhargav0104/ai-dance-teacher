@@ -33,6 +33,7 @@ from app.services.intake import (
     title_from,
     validate_idempotency_key,
 )
+from app.services.subjects import SubjectOut, subject_out
 from app.storage import get_storage
 
 router = APIRouter(tags=["projects"])
@@ -68,6 +69,8 @@ class ReferenceOut(BaseModel):
     pipeline_version: str | None = None
     model_version: str | None = None
     analyzed_at: datetime | None = None
+    # Who is in the video and whom we follow (A2); null for single-person videos.
+    subject: SubjectOut | None = None
 
 
 class JobOut(BaseModel):
@@ -114,7 +117,7 @@ class SampleRequest(BaseModel):
     sample_id: str = Field(min_length=1, max_length=64)
 
 
-MediaKind = Literal["source", "canonical", "poster"]
+MediaKind = Literal["source", "canonical", "poster", "people"]
 
 
 class MediaUrl(BaseModel):
@@ -182,6 +185,7 @@ def to_out(db: Session, project: DanceProject) -> ProjectOut:
             pipeline_version=ref.pipeline_version,
             model_version=ref.model_version,
             analyzed_at=ref.analyzed_at,
+            subject=subject_out(ref.subject),
         )
         if ref
         else None,
@@ -361,7 +365,8 @@ def project_media_url(
     settings: Annotated[Settings, Depends(get_settings)],
     response: Response,
 ) -> MediaUrl:
-    """Short-lived signed URL for the private original, canonical copy or poster frame."""
+    """Short-lived signed URL for the private original, canonical copy, poster frame or the
+    frame used to choose whom to follow (`people`)."""
     project = owned_project(db, user.id, project_id)
     ref = project.reference_video
     key = None
@@ -370,6 +375,7 @@ def project_media_url(
             "source": ref.source_object_key,
             "canonical": ref.canonical_object_key,
             "poster": ref.thumbnail_key,
+            "people": (ref.subject or {}).get("frame_key"),
         }[kind]
     if ref is None or key is None:
         raise ApiError(404, "media_not_found", "This video isn't available yet.")

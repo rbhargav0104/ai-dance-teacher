@@ -108,6 +108,8 @@ jobs:
           NODE_PATH=/tmp/pw/node_modules node scripts/e2e/teacher-mode.cjs e2e-shots
       - name: Practice browser check (fake webcam fed real footage → real learner pose → side by side)
         run: NODE_PATH=/tmp/pw/node_modules node scripts/e2e/practice.cjs e2e-shots/practice
+      - name: Choose-the-dancer browser check (real two-dancer video → picker → follow left, then right)
+        run: NODE_PATH=/tmp/pw/node_modules node scripts/e2e/choose-dancer.cjs e2e-shots/choose-dancer
       - name: Upload Teacher Mode screenshots
         if: always()
         uses: actions/upload-artifact@v4

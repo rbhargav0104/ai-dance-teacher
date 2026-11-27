@@ -75,6 +75,34 @@ export interface ReferenceInfo {
   pipeline_version?: string | null;
   model_version?: string | null;
   analyzed_at?: string | null;
+  /** Who is in the video and whom we follow (spec amendment A2); null for one person. */
+  subject?: SubjectInfo | null;
+}
+
+/** One real person detected in the video (backend app.pose.people). */
+export interface SubjectCandidate {
+  person: number; // 1-based, numbered left to right in the choosing frame
+  box: [number, number, number, number]; // x0, y0, x1, y1 as fractions of the frame
+  root: [number, number];
+  position: string;
+  share: number; // fraction of the video in which this person could be followed
+}
+
+export interface SubjectChoice {
+  person: number;
+  position: string;
+  t: number;
+  box: [number, number, number, number];
+  chosen_at?: string | null;
+}
+
+export interface SubjectInfo {
+  version: string;
+  frame_time: number;
+  has_frame: boolean;
+  candidates: SubjectCandidate[];
+  choice: SubjectChoice | null;
+  followed: { fraction: number; lost_spans: [number, number][]; uncertain_spans: [number, number][] } | null;
 }
 
 export interface QualityReport {
@@ -142,7 +170,7 @@ export interface MediaUrl {
   kind: MediaKind;
 }
 
-export type MediaKind = "source" | "canonical" | "poster";
+export type MediaKind = "source" | "canonical" | "poster" | "people";
 
 /** [x, y, z, visibility, presence] in image-normalized coordinates. */
 export type Landmark = [number, number, number, number, number];
@@ -166,6 +194,8 @@ export interface PoseFrameData {
   shoulder_tilt: number | null;
   hip_tilt: number | null;
   yaw_experimental: number | null;
+  /** Set when following a chosen person (A2): whether they were found in this frame. */
+  subject?: "followed" | "lost" | "uncertain" | null;
 }
 
 export interface PoseFrame {
@@ -282,6 +312,7 @@ export interface PracticeSession {
   analyzed_at: string | null;
   created_at: string;
   latest_job: JobInfo | null;
+  subject?: SubjectInfo | null;
   /** Always false until comparison + scoring exist (Outcomes 6–7). */
   scored: boolean;
 }

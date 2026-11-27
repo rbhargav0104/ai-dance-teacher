@@ -40,7 +40,19 @@ WARNING_MESSAGES: dict[str, str] = {
     ),
     "low_tracking_confidence": "Tracking confidence is low; joint measurements may be noisy.",
     "brief_extra_person": "Another person appears briefly; we followed the main dancer.",
+    "other_people_ignored": (
+        "Other people in the video were ignored; we followed the person you chose."
+    ),
+    "chosen_dancer_lost": (
+        "We lost the person you chose for part of the video; those moments are left out, "
+        "never filled in with someone else."
+    ),
 }
+
+CHOOSE_DANCER_MESSAGE = (
+    "There's more than one person in this video. Choose who we should follow, and we'll "
+    "analyse only them."
+)
 
 
 def _pose_root(pose: FloatArray) -> FloatArray:
@@ -135,8 +147,16 @@ class QualityReport:
 
 
 def assess(
-    f: TrackFeatures, poses_per_frame: NDArray[np.int64], cfg: QualityConfig | None = None
+    f: TrackFeatures,
+    poses_per_frame: NDArray[np.int64],
+    cfg: QualityConfig | None = None,
+    *,
+    chosen_person: bool = False,
+    lost_chosen_frames: int = 0,
 ) -> QualityReport:
+    """Clip-level gates. `poses_per_frame` counts distinct people (see people.distinct_people).
+    With `chosen_person` the user picked whom to follow (A2): other people are not a failure,
+    and frames where we lost that person are reported."""
     cfg = cfg or QualityConfig()
     total = len(f.valid)
     valid_n = int(f.valid.sum())
@@ -158,7 +178,7 @@ def assess(
     failure: str | None = None
     if int((poses_per_frame > 0).sum()) == 0:
         failure = "no_dancer_detected"
-    elif multi > cfg.max_multi_person_fraction:
+    elif multi > cfg.max_multi_person_fraction and not chosen_person:
         failure = "multiple_people"
     elif coverage < cfg.fail_coverage or valid_n < cfg.min_valid_frames:
         failure = "low_coverage"
@@ -171,7 +191,12 @@ def assess(
             warnings.append("cropped_body")
         if measured_conf < 0.75:
             warnings.append("low_tracking_confidence")
-        if multi > 0:
+        if chosen_person:
+            if multi > 0:
+                warnings.append("other_people_ignored")
+            if lost_chosen_frames > 0:
+                warnings.append("chosen_dancer_lost")
+        elif multi > 0:
             warnings.append("brief_extra_person")
 
     message = None

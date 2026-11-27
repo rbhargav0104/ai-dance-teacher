@@ -80,3 +80,21 @@ Append new entries at the bottom. Format: date — decision — reason.
   alignment cache-invalidation test.
 - 2026-11-27 — Attempt review follows the alignment path by default ("Matched moves"), "Same time" for clock playback. — The
   point of Outcome 6 for the learner: late or slower attempts still show the matching moves side by side.
+- 2026-11-28 — A2 "choose the dancer": the pose model now returns up to 4 people (was 2). A detection whose body box sits
+  ≥ 60 % inside a bigger one is the same person (fixes the hip-band false "second person" from 2026-11-27); the
+  multi-person gate counts only these distinct people. Single-dancer clips keep the old follower and gave identical
+  results (Teacher Mode arm errors unchanged to 0.1°).
+- 2026-11-28 — Identity = position + appearance: a 4×4×4 RGB histogram of the inner torso measured on the real frame for
+  every detection. The chosen person is accepted only within a growing radius AND within Hellinger 0.45 of their
+  remembered look, at least 0.12 closer than anyone nearby; otherwise the frame is "lost"/"uncertain" and masked, never
+  filled with someone else. After 6 missed frames they may be reacquired anywhere, by appearance only. Calibrated on the
+  real composites: own-look distance ≤ 0.47 (99th pct 0.39), other person ≥ 0.55. Limitation: two people dressed alike
+  who also overlap will be masked rather than told apart.
+- 2026-11-28 — Several people for > 20 % of frames (the existing gate) → job ends with project/attempt status
+  `needs_subject` (error code `choose_dancer`, job `failed`/non-retryable so nothing downstream runs) and a stored
+  record: the clearest frame showing everyone apart (JPEG, private) + candidates numbered left→right with box, hip point
+  and the share of the video each can be followed. Below 20 % the main person is followed (now with the identity-aware
+  follower when ≥ 2 people were ever seen apart) and "Follow someone else" is offered. The choice is stored by time + hip
+  point and re-located after re-extraction (deterministic), candidates are kept while a choice is in force.
+- 2026-11-28 — `POST /api/projects/{id}/subject` and `/api/practice-sessions/{id}/subject`: 202 + re-analysis; same person
+  again → 200 with the current job; different person while a job runs → 409; LIMITED → choice saved, 503.

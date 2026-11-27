@@ -167,9 +167,11 @@ def test_sample_reference_yields_aligned_skeleton_and_features(
     assert real.get(poster["url"]).content[:2] == b"\xff\xd8"
 
 
-def test_multi_person_clip_fails_honestly(
+def test_multi_person_clip_asks_who_to_follow(
     real: TestClient, auth: dict[str, str], tmp_path: Path
 ) -> None:
+    """Spec amendment A2: two dancers no longer fail; analysis stops at "Who should we follow?"
+    (the full choose → follow flow is in test_subject_choice.py)."""
     duo = tmp_path / "duo.mp4"
     ffmpeg(
         "-i", str(GIRL), "-i", str(BOY), "-filter_complex",
@@ -178,11 +180,14 @@ def test_multi_person_clip_fails_honestly(
     )  # fmt: skip
     pid = upload(real, auth, duo)
     p = analyze(real, auth, pid)
-    assert p["status"] == "failed"
-    assert p["error_code"] == "multiple_people"
+    assert p["status"] == "needs_subject"
+    assert p["error_code"] == "choose_dancer"
     job = p["latest_job"]
-    assert isinstance(job, dict) and job["status"] == "failed" and job["retryable"] is False
-    # The failed analysis is still inspectable in the debugger.
+    assert isinstance(job, dict) and job["retryable"] is False
+    subject = p["reference"]["subject"]  # type: ignore[index]
+    assert [c["person"] for c in subject["candidates"]] == [1, 2]
+    assert subject["choice"] is None
+    # The measurements are still inspectable in the debugger.
     q = real.get(f"/api/projects/{pid}/poses", headers=auth).json()
     assert q["quality"]["multi_person_fraction"] > 0.2
 
