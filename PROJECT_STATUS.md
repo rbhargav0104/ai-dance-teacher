@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-28 ~03:30 IST (build session 8)_
+_Last updated: 2026-11-28 ~16:00 IST (build session 9)_
 
 ## Outcomes
 
@@ -14,13 +14,37 @@ _Last updated: 2026-11-28 ~03:30 IST (build session 8)_
 | 5 | Learner capture + real learner pose | **tested** | Exit gate met (evidence below), ~1.5 days ahead of plan. Real webcam path verified with Chromium's fake camera fed real footage; a human webcam + phone camera not tried yet. |
 | 6 | Normalized alignment | **tested** | Exit gate met on real footage (evidence below). |
 | A2 | Choose the dancer (multi-person videos) | **tested** | Amendment exit gate met on real composited footage + Playwright desktop/mobile (evidence below). Scores follow automatically once Outcome 7 exists. |
-| 7 | Versioned scoring | planned | |
+| 7 | Versioned scoring | **tested** | Exit gate met on real footage, 2 references (evidence below), two days ahead of plan. Gap: no third reference dance and no real wrong-limb fixture (synthetic tests cover wrong arm/elbow). |
 | 8 | Actionable feedback | planned | |
 | 9 | Report, repeat, dashboard | planned | |
 | 10 | Production identity + durable infra | planned | |
 | 11 | Stable deployment + full acceptance | planned | |
 
-States: planned → implemented → tested → deployed. Ahead of the revised plan: Outcome 6 done Nov 27 pm (planned Nov 29). A2 (choose the dancer) done Nov 28 early. Next: Outcome 7 versioned scoring.
+States: planned → implemented → tested → deployed. Ahead of the revised plan: Outcome 6 done Nov 27 pm (planned Nov 29). A2 (choose the dancer) done Nov 28 early. Outcome 7 done Nov 28 pm (planned Nov 30). Next: Outcome 8 actionable feedback.
+
+### Outcome 7 exit gate — evidence ("scores are deterministic, bounded, evidence-linked, and suppressed/qualified when data quality is inadequate")
+- *Golden relationships on real footage* (`tests/test_scoring_golden.py`, 21 claims in `fixtures/fixture_manifest.json`
+  → `scoring_relations`, both Mixkit references analysed by the real worker + MediaPipe, attempts are committed FFmpeg
+  variants). Measured (overall · pose / timing / sequence / angles / rhythm): girl_good 97.9 (97/100/99/100/90);
+  occluded 98.9 but confidence 0.72 vs 0.86 and 23 fewer moments compared; 0.4 s late 92.3 (pose 97, timing 73);
+  0.9×/1.1× 84 (pose 97, timing 48/57); mirrored 92.9, compared as a mirror image; 4 s freeze 87.6 (sequence 80);
+  60 %-size shifted 83.6 qualified (pose 73 — small figures measure less precisely); different dance 22.5.
+  Second reference: boy_good 99.6, boy late 92.4 (timing 74, pose 99), girl's dance vs boy 26.1; rhythm honestly
+  unavailable on the boy clip (no clear motion accents) and re-weighted.
+- *Pure rules* (`tests/test_scoring_math.py`, 19 tests, synthetic sequences through the stored-payload path): curve
+  bounded/monotonic; product weights; identical ≥ 95; size/position don't dominate; 0.5 s late hits timing ≥ 15 more than
+  pose; wrong arm height lowers pose and names the left arm in every worst moment; straight elbow lowers joint angles;
+  freeze lowers sequence; untracked span lowers confidence not points; mostly untracked → not scored; low confidence →
+  suppressed with no numbers; qualified path; immobile reference → not scored; rhythm gated (too short / no accents) and
+  re-weighted; tempo lowers rhythm; section breakdown finds the weak half; random movements stay in 0–100; deterministic
+  (byte-identical report); alignment from other sequences rejected.
+- *API contract* (`tests/test_report_api.py`): 409 before analysis, same 404 for foreign/missing; stored row reused
+  (`cached`), summary on the attempt + list; section attempt scored on its window; moving a boundary invalidates the
+  stored score; without numpy → 503 (nothing estimated); delete removes the stored score.
+- *Browser* (`node scripts/e2e/practice.cjs`, also in CI): score card status/overall equal the report; withheld state
+  shows no numbers; "Moments to replay" seeks the attempt 1 s before the moment and plays both videos; flipped upload
+  scored as a mirror image with per-section breakdown; attempt list shows the stored score; desktop + iPhone 13 without
+  overflow or console errors.
 
 ### A2 exit gate — evidence ("pick the left dancer → everything follows the left dancer; re-run with the right; a crossing never switches silently")
 - *Real footage* (`tests/test_subject_choice.py`, real MediaPipe on `fixtures/multi/*`, identity checked on the video's own
@@ -134,6 +158,14 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 
 ## What exists today
 
+- **Scoring (Outcome 7)**: `GET /api/practice-sessions/{id}/report` → versioned report (`score-1` on `align-1`): overall
+  0–100 + pose / timing / sequence / joint angles / rhythm (experimental, gated), the weights actually used, coverage
+  (reference + learner tracking, compared moments, visible joints, alignment confidence, warp, confidence), measured
+  evidence per component, body parts, worst/best moments (with times on both videos), per-section breakdown for
+  full-dance attempts, warnings, and status `scored` / `qualified` / `suppressed` / `not_scored`. Stored in
+  `performance_scores`; attempt responses carry a `score` summary. The attempt page shows the score card above the
+  timing facts; moments replay in the side-by-side player.
+
 - **Choose the dancer (A2)**: up to 4 real detections per frame; overlapping duplicates merged. When several people are
   visible for more than 20 % of a reference or attempt, analysis stops at **"Who should we follow?"**: the clearest real
   frame with each person outlined and numbered, a 3:4 crop of each, where they are and how much of the video they're in.
@@ -211,6 +243,13 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 - **CI** (`.github/workflows/ci.yml`): backend ruff + mypy strict + pytest (incl. real model load) + pose smoke;
   frontend eslint + tsc + vitest + build; end-to-end boot smoke.
 
+## Verified claims — session 9 (2026-11-28 pm)
+
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → see RUN_LOG.
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 101 passed.
+- Built web + API (READY): `scripts/smoke.sh` → SMOKE OK; `practice.cjs` (incl. score card) → PRACTICE CHECK OK;
+  `teacher-mode.cjs`, `choose-dancer.cjs`, `learn-mode.cjs` → OK. Score card screenshots reviewed (desktop + iPhone 13).
+
 ## Verified claims — session 8 (2026-11-28 early)
 
 - `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → see RUN_LOG.
@@ -278,7 +317,7 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
 ## Known gaps / unverified
 
 - Practice: not yet tried with a human on a real laptop webcam or phone camera (Safari records MP4 — code path exists,
-  untested). Scores and feedback are Outcomes 7–8. Upload goes through the Next proxy (buffers in memory, see below).
+  untested). Feedback items are Outcome 8. Upload goes through the Next proxy (buffers in memory, see below).
 - Alignment: cost coefficients are calibrated on one reference clip (cropped at the hips) + its variants; smaller figures
   read as more different because the pose model measures them less precisely. A section attempt is expected to start with
   the section (the band is anchored at the recording's start). Re-check with more fixtures at Outcome 7.
@@ -298,6 +337,10 @@ States: planned → implemented → tested → deployed. Ahead of the revised pl
   the dancer faces the camera; labelled experimental. Boundary tuning is checked on 2 real clips + synthetic sequences.
 - While editing, chips whose boundaries moved show no thumbnail until saved (server regenerates them).
 
+- Scoring: half-credit errors and gates calibrated on 2 references (both crop the legs) + their FFmpeg variants; no
+  third reference, no real wrong-limb fixture, no human-rated attempts. Rhythm uses body-motion envelopes only (no
+  audio) and is labelled experimental. A camera attempt whose recording doesn't line up with the section start can
+  honestly be suppressed (seen with the looping fake camera).
 - Smoothing parameters and gate thresholds (55%/85% coverage, 20% multi-person, 0.5 visibility) are spec defaults checked
   on 2 clips + variants only; recalibrate with more fixtures (Outcome 7).
 - Joint angles are 2-D (image plane); world landmarks are stored but not yet used. Yaw is experimental and labelled so.
@@ -328,7 +371,10 @@ The one-click Codespaces path lands on Dec 3. Until then:
    - on a phone (same Wi-Fi, http://<laptop-ip>:3000) the stage switches to a tall layout;
    - **Practise this section** → Turn on camera → Record → dance along with the corner video → Stop → Use this take →
      ~10 s later you and the reference play side by side with skeletons; the reference follows your moves along the
-     measured alignment (**Same time** switches to the clock), "Timing & sides" lists measured facts (late/early, pace,
+     measured alignment (**Same time** switches to the clock); above the timing facts the **score card** shows your
+     score out of 100 with pose / timing / sequence / joint angles / rhythm, what each was measured from, how much was
+     compared and how confident it is ("low confidence" or no number at all when tracking was poor); tap a
+     "Moment to replay" to jump both videos there; "Timing & sides" lists measured facts (late/early, pace,
      mirrored, missed or untracked passages) and **See how moves were paired** opens the alignment view.
    - **Two dancers**: upload `fixtures/multi/duo_girl_left.mp4` from the repo → **Analyze Choreography** → "Who should we
      follow?" → tap either dancer → ~10 s later the avatar and sections follow only that person; **Follow someone else**

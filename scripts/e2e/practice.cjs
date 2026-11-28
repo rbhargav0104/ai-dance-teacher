@@ -174,6 +174,27 @@ const Y4M = path.join(OUT, 'fake-camera.y4m');
     }
     const skel = await page.locator('[data-testid="side-by-side"] canvas').count();
     check(skel === 2, 'measured skeletons drawn on both videos');
+    // Score (Outcome 7): the card shows exactly what the versioned report says.
+    await page.getByTestId('score-card').waitFor({ timeout: 30000 });
+    const rep = (await j(await fetch(WEB + `/api/practice-sessions/${attemptId}/report`, { headers: H }))).report;
+    const cardStatus = await page.getByTestId('score-card').getAttribute('data-status');
+    check(rep.version === 'score-1' && cardStatus === rep.status, `score card status ${cardStatus} = report ${rep.status} (overall ${rep.overall}, confidence ${rep.coverage.confidence})`);
+    if (rep.overall !== null) {
+      const shownOverall = await page.getByTestId('score-overall').innerText();
+      check(shownOverall.startsWith(String(Math.round(rep.overall))), `overall shown as ${shownOverall.split('/')[0].trim()} (report ${rep.overall})`);
+      const moments = page.getByTestId('score-moment');
+      if ((await moments.count()) > 0) {
+        const mt = Number(await moments.first().getAttribute('data-t'));
+        await moments.first().click();
+        await page.waitForTimeout(600);
+        const lt = await page.evaluate(() => document.querySelector('[data-testid="review-learner"]').currentTime);
+        check(lt >= Math.max(0, mt - 1) - 0.05 && lt <= mt + 1.5, `replay moment ${mt.toFixed(2)}s seeks the attempt (now ${lt.toFixed(2)}s)`);
+        await page.getByTestId('review-play').click().catch(() => {});
+      }
+    } else {
+      check((await page.getByTestId('score-withheld').count()) === 1, `no numbers when the score is withheld (${rep.reason})`);
+    }
+    await page.getByTestId('score-card').screenshot({ path: path.join(OUT, 'score-card-desktop.png') });
     await page.screenshot({ path: path.join(OUT, 'attempt-review-desktop.png') });
     check((await overflow(page)) <= 0, 'desktop review: no horizontal overflow');
     // Developer alignment view.
@@ -194,8 +215,10 @@ const Y4M = path.join(OUT, 'fake-camera.y4m');
     const m = await open({ ...devices['iPhone 13'] }, 'mobile');
     await m.page.goto(`${WEB}/studio/practice/${attemptId}`);
     await m.page.getByTestId('side-by-side').waitFor({ timeout: 30000 });
+    await m.page.getByTestId('score-card').waitFor({ timeout: 30000 });
     await m.page.waitForTimeout(800);
     await m.page.screenshot({ path: path.join(OUT, 'attempt-review-mobile.png'), fullPage: true });
+    await m.page.getByTestId('score-card').screenshot({ path: path.join(OUT, 'score-card-mobile.png') });
     check((await overflow(m.page)) <= 0, 'mobile review: no horizontal overflow');
     await m.page.goto(`${WEB}/studio/practice/${attemptId}/alignment`);
     await m.page.getByTestId('alignment-report').waitFor({ timeout: 30000 });
@@ -228,12 +251,19 @@ const Y4M = path.join(OUT, 'fake-camera.y4m');
     await page.getByTestId('side-by-side').waitFor({ timeout: 30000 });
     await page.getByText('Your feet were out of frame').waitFor();
     check(true, 'tracking note shown on the review page');
+    await page.getByTestId('score-card').waitFor({ timeout: 30000 });
+    const mrep = (await j(await fetch(WEB + `/api/practice-sessions/${id}/report`, { headers: H }))).report;
+    check(['scored', 'qualified'].includes(mrep.status) && mrep.overall >= 70 && mrep.warnings.includes('compared_mirrored'),
+      `flipped upload scored as a mirror image: ${mrep.status} ${mrep.overall}, sections ${mrep.sections.map((x) => x.overall).join('/')}`);
+    await page.getByText('compared as a mirror image').waitFor();
+    check((await page.getByTestId('score-sections').count()) === 1, 'full-dance attempt shows the per-section breakdown');
     // Attempts list + delete
     await page.goto(`${WEB}/studio/projects/${pid}/practice`);
     const rows = page.getByTestId('attempt-list').locator('li');
     await rows.first().waitFor();
     const before = await rows.count();
     check(before === 2, `attempt list shows both attempts (${before})`);
+    check((await page.getByTestId('attempt-list-score').count()) >= 1, 'attempt list shows the stored score');
     await page.getByRole('button', { name: /Delete attempt: Full dance/ }).click();
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
     await page.waitForFunction((n) => document.querySelectorAll('[data-testid="attempt-list"] li').length === n - 1, before, { timeout: 10000 });

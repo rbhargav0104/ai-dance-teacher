@@ -541,7 +541,15 @@ function AttemptList({ attempts, onDelete }: { attempts: PracticeSession[] | nul
                 <AttemptChip attempt={a} />
               </div>
               <div className="mt-2 flex items-center justify-between text-xs text-muted">
-                <span>{a.tracking_coverage !== null ? `Body tracked ${percent(a.tracking_coverage)}` : a.duration ? formatDuration(a.duration) : ""}</span>
+                <span>
+                  {a.score?.overall != null && (
+                    <span className="mr-2 font-display font-semibold text-lime" data-testid="attempt-list-score">
+                      {Math.round(a.score.overall)}
+                      <span className="text-muted">/100{a.score.status === "qualified" ? " · low confidence" : ""}</span> ·
+                    </span>
+                  )}
+                  {a.tracking_coverage !== null ? `Body tracked ${percent(a.tracking_coverage)}` : a.duration ? formatDuration(a.duration) : ""}
+                </span>
                 {confirm === a.id ? (
                   <span className="flex gap-2">
                     <button type="button" onClick={() => setConfirm(null)} className="hover:text-ink">

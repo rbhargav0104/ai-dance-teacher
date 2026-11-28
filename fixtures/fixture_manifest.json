@@ -196,6 +196,38 @@
       "expected_relationship": "a different dance (Mixkit 28289) compared against the girl reference: should score clearly lower than every girl_* variant.",
       "license": "Mixkit Free License",
       "generated_by": "scripts/make_attempt_fixtures.py"
+    },
+    {
+      "id": "boy_good",
+      "file": "attempts/boy_good.mp4",
+      "reference": "mixkit_boy_funny_28289",
+      "derived_from": "mixkit_boy_funny_28289",
+      "sha256": "42a78e6a3a4b67e1eac168bd23bc3c9a1fd51fedf6599952657c35b269c2bbac",
+      "bytes": 505992,
+      "width": 640,
+      "height": 360,
+      "duration": 15.958,
+      "fps": 24,
+      "transform": "ffmpeg -i mixkit_boy_funny_28289.mp4 -vf \"scale=640:360,fps=24\" -an -c:v libx264 -preset medium -crf 28 -pix_fmt yuv420p -threads 1 -movflags +faststart -map_metadata -1 boy_good.mp4",
+      "expected_relationship": "the boy performance re-encoded at 640x360: should score highest of the boy_* attempts (upper bound for the second reference).",
+      "license": "Mixkit Free License",
+      "generated_by": "scripts/make_attempt_fixtures.py"
+    },
+    {
+      "id": "boy_late_0_4s",
+      "file": "attempts/boy_late_0_4s.mp4",
+      "reference": "mixkit_boy_funny_28289",
+      "derived_from": "mixkit_boy_funny_28289",
+      "sha256": "bba2fd5e5868ce18771f0ae5a7f1a446698956c8fddce19b97adf311a60fc984",
+      "bytes": 508216,
+      "width": 640,
+      "height": 360,
+      "duration": 16.375,
+      "fps": 24,
+      "transform": "ffmpeg -i mixkit_boy_funny_28289.mp4 -vf \"scale=640:360,fps=24,tpad=start_duration=0.4:start_mode=clone\" -an -c:v libx264 -preset medium -crf 28 -pix_fmt yuv420p -threads 1 -movflags +faststart -map_metadata -1 boy_late_0_4s.mp4",
+      "expected_relationship": "the boy performance starting 0.4 s late: pose similar to boy_good, timing component clearly lower.",
+      "license": "Mixkit Free License",
+      "generated_by": "scripts/make_attempt_fixtures.py"
     }
   ],
   "multi_person": [
@@ -270,6 +302,221 @@
       "expected_relationship": "the boy (chroma-keyed, in front) drifts from the left edge to the right across the girl (behind) and covers her around 3-6 s: whoever is followed is kept or masked while they overlap, never silently swapped.",
       "license": "Mixkit Free License",
       "generated_by": "scripts/make_multi_person_fixtures.py"
+    }
+  ],
+  "scoring_relations": [
+    {
+      "id": "girl-good-highest",
+      "reference": "girl",
+      "type": "highest",
+      "a": "girl_good",
+      "others": [
+        "girl_scaled_translated",
+        "girl_speed_0_9x",
+        "girl_speed_1_1x",
+        "girl_late_0_4s",
+        "girl_mirrored",
+        "girl_missing_middle",
+        "boy_wrong_dance"
+      ],
+      "margin": 3,
+      "claim": "The re-encoded reference performance scores highest (by ≥ 3) of every degraded attempt."
+    },
+    {
+      "id": "girl-occluded-close",
+      "reference": "girl",
+      "type": "within",
+      "a": "girl_occluded",
+      "b": "girl_good",
+      "margin": 4,
+      "claim": "A 3 s blocked view is skipped, not scored as bad dancing: overall stays within 4 of good."
+    },
+    {
+      "id": "girl-occluded-confidence",
+      "reference": "girl",
+      "type": "lower",
+      "a": "girl_occluded",
+      "b": "girl_good",
+      "metric": "coverage.confidence",
+      "margin": 0.05,
+      "claim": "... but its confidence is lower (by ≥ 0.05)."
+    },
+    {
+      "id": "girl-occluded-frames",
+      "reference": "girl",
+      "type": "lower",
+      "a": "girl_occluded",
+      "b": "girl_good",
+      "metric": "coverage.compared_frames",
+      "margin": 20,
+      "claim": "... and fewer moments are compared (by ≥ 20)."
+    },
+    {
+      "id": "girl-scaled-pose",
+      "reference": "girl",
+      "type": "lower",
+      "a": "boy_wrong_dance",
+      "b": "girl_scaled_translated",
+      "metric": "pose",
+      "margin": 25,
+      "claim": "A 60 %-size, shifted copy keeps a pose score far above a different dance (≥ 25 points); the small figure is measured less precisely, so it is not expected to equal good."
+    },
+    {
+      "id": "girl-scaled-overall",
+      "reference": "girl",
+      "type": "within",
+      "a": "girl_scaled_translated",
+      "b": "girl_good",
+      "margin": 18,
+      "claim": "The 60 %-size, shifted copy stays within 18 of good overall (known limitation: small figures)."
+    },
+    {
+      "id": "girl-late-timing",
+      "reference": "girl",
+      "type": "drops_more",
+      "a": "girl_late_0_4s",
+      "b": "girl_good",
+      "metric": "timing",
+      "than": "pose",
+      "margin": 15,
+      "claim": "0.4 s late: timing drops at least 15 points more than pose."
+    },
+    {
+      "id": "girl-late-pose",
+      "reference": "girl",
+      "type": "within",
+      "a": "girl_late_0_4s",
+      "b": "girl_good",
+      "metric": "pose",
+      "margin": 3,
+      "claim": "0.4 s late: pose stays within 3 of good."
+    },
+    {
+      "id": "girl-slow-timing",
+      "reference": "girl",
+      "type": "lower",
+      "a": "girl_speed_0_9x",
+      "b": "girl_good",
+      "metric": "timing",
+      "margin": 25,
+      "claim": "0.9x speed: timing at least 25 below good."
+    },
+    {
+      "id": "girl-slow-pose",
+      "reference": "girl",
+      "type": "within",
+      "a": "girl_speed_0_9x",
+      "b": "girl_good",
+      "metric": "pose",
+      "margin": 3,
+      "claim": "0.9x speed: pose within 3 of good (alignment pairs the moves)."
+    },
+    {
+      "id": "girl-fast-timing",
+      "reference": "girl",
+      "type": "lower",
+      "a": "girl_speed_1_1x",
+      "b": "girl_good",
+      "metric": "timing",
+      "margin": 25,
+      "claim": "1.1x speed: timing at least 25 below good."
+    },
+    {
+      "id": "girl-fast-pose",
+      "reference": "girl",
+      "type": "within",
+      "a": "girl_speed_1_1x",
+      "b": "girl_good",
+      "metric": "pose",
+      "margin": 3,
+      "claim": "1.1x speed: pose within 3 of good."
+    },
+    {
+      "id": "girl-mirrored-detected",
+      "reference": "girl",
+      "type": "warning",
+      "a": "girl_mirrored",
+      "has": "compared_mirrored",
+      "claim": "A flipped video is compared mirrored, and the report says so."
+    },
+    {
+      "id": "girl-mirrored-close",
+      "reference": "girl",
+      "type": "within",
+      "a": "girl_mirrored",
+      "b": "girl_good",
+      "margin": 8,
+      "claim": "... and scores within 8 of good overall."
+    },
+    {
+      "id": "girl-missing-sequence",
+      "reference": "girl",
+      "type": "lower",
+      "a": "girl_missing_middle",
+      "b": "girl_good",
+      "metric": "sequence",
+      "margin": 10,
+      "claim": "A 4 s freeze in the middle lowers sequence by ≥ 10."
+    },
+    {
+      "id": "girl-missing-sequence-vs-timing",
+      "reference": "girl",
+      "type": "drops_more",
+      "a": "girl_missing_middle",
+      "b": "girl_good",
+      "metric": "sequence",
+      "than": "timing",
+      "margin": 10,
+      "claim": "... more than it lowers timing (≥ 10 points more)."
+    },
+    {
+      "id": "girl-wrong-dance-low",
+      "reference": "girl",
+      "type": "below",
+      "a": "boy_wrong_dance",
+      "margin": 50,
+      "claim": "A different dance scores below 50 overall."
+    },
+    {
+      "id": "girl-wrong-dance-lowest",
+      "reference": "girl",
+      "type": "lower",
+      "a": "boy_wrong_dance",
+      "b": "girl_scaled_translated",
+      "margin": 30,
+      "claim": "... at least 30 below the weakest same-dance attempt (the small shifted copy)."
+    },
+    {
+      "id": "boy-good-highest",
+      "reference": "boy",
+      "type": "highest",
+      "a": "boy_good",
+      "others": [
+        "boy_late_0_4s",
+        "girl_good"
+      ],
+      "margin": 3,
+      "claim": "Second reference: the re-encoded performance scores highest."
+    },
+    {
+      "id": "boy-late-timing",
+      "reference": "boy",
+      "type": "drops_more",
+      "a": "boy_late_0_4s",
+      "b": "boy_good",
+      "metric": "timing",
+      "than": "pose",
+      "margin": 15,
+      "claim": "Second reference, 0.4 s late: timing drops at least 15 points more than pose."
+    },
+    {
+      "id": "boy-wrong-dance",
+      "reference": "boy",
+      "type": "lower",
+      "a": "girl_good",
+      "b": "boy_late_0_4s",
+      "margin": 30,
+      "claim": "Second reference: a different dance scores at least 30 below the late attempt."
     }
   ]
 }

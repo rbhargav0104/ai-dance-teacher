@@ -313,8 +313,17 @@ export interface PracticeSession {
   created_at: string;
   latest_job: JobInfo | null;
   subject?: SubjectInfo | null;
-  /** Always false until comparison + scoring exist (Outcomes 6–7). */
+  /** True once a still-valid score with an overall number is stored (Outcome 7). */
   scored: boolean;
+  /** Compact summary of that stored score; null until the report was computed or when stale. */
+  score?: ScoreSummary | null;
+}
+
+export interface ScoreSummary {
+  status: ScoreStatus | string | null;
+  overall: number | null;
+  version: string | null;
+  confidence: number | null;
 }
 
 export interface PracticeList {
@@ -401,4 +410,86 @@ export interface AlignmentResponse {
   practice_id: string;
   cached: boolean;
   alignment: Alignment;
+}
+
+// ---------------------------------------------------------------- scoring (Outcome 7)
+
+export type ScoreStatus = "scored" | "qualified" | "suppressed" | "not_scored";
+export type ComponentKey = "pose" | "timing" | "sequence" | "joint_angles" | "rhythm";
+
+export interface ScoreMoment {
+  ref_t: number | null;
+  learner_t: number | null;
+  pose_value: number | null;
+  joint_distance_torso: number | null;
+  largest_differences: string[];
+}
+
+export interface SectionScore {
+  id: string | null;
+  title: string | null;
+  start: number;
+  end: number;
+  compared_pairs: number;
+  status: "scored" | "insufficient";
+  overall: number | null;
+  components: Partial<Record<ComponentKey, number | null>> | null;
+}
+
+export interface BodyPartScore {
+  tracked: boolean;
+  reason?: "not_in_reference" | "not_tracked";
+  mean_distance_torso?: number | null;
+  value?: number | null;
+  pairs?: number;
+}
+
+/** Versioned score report (backend app.pose.scoring.score). */
+export interface ScoreReport {
+  version: string;
+  alignment_version: string | null;
+  status: ScoreStatus | string;
+  reason?: string | null;
+  reasons?: string[];
+  message?: string | null;
+  qualifiers?: string[];
+  overall: number | null;
+  components: Record<ComponentKey, number | null>;
+  weights: Record<ComponentKey, number>;
+  weights_used: Partial<Record<ComponentKey, number>>;
+  warnings: string[];
+  coverage: {
+    reference_tracking: number | null;
+    learner_tracking: number | null;
+    compared_frames: number;
+    reference_frames: number;
+    visible_joint_coverage: number | null;
+    masked_fraction: number | null;
+    alignment_confidence: number | null;
+    warp: number | null;
+    confidence: number | null;
+  };
+  evidence?: {
+    pose?: { mean_joint_distance_torso: number | null; mean_lean_difference_deg: number | null; pairs: number };
+    joint_angles?: { focused_angle_error_deg: number | null; pairs: number };
+    timing?: { median_offset_s: number | null; mean_abs_offset_s: number | null; on_time_share: number | null; tolerance_s: number };
+    sequence?: {
+      matched_share: number | null;
+      missing_share: number | null;
+      held_share: number | null;
+      mean_direction_disagreement: number | null;
+      non_diagonal_fraction: number | null;
+    };
+    rhythm?: { unavailable?: string; envelope_correlation?: number | null; pace_ratio?: number | null; experimental?: boolean };
+  };
+  body_parts?: Record<string, BodyPartScore>;
+  moments?: { worst: ScoreMoment[]; best: ScoreMoment | null };
+  sections?: SectionScore[];
+  window?: { start: number; end: number; segment_id: string | null };
+}
+
+export interface ScoreReportResponse {
+  practice_id: string;
+  cached: boolean;
+  report: ScoreReport;
 }

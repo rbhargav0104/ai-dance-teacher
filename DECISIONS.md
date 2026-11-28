@@ -98,3 +98,27 @@ Append new entries at the bottom. Format: date — decision — reason.
   point and re-located after re-extraction (deterministic), candidates are kept while a choice is in force.
 - 2026-11-28 — `POST /api/projects/{id}/subject` and `/api/practice-sessions/{id}/subject`: 202 + re-analysis; same person
   again → 200 with the current job; different person while a job runs → 409; LIMITED → choice saved, 503.
+- 2026-11-28 — Outcome 7 scoring `score-1` (`app/pose/scoring.py`) works on the `align-1` pairs (one representative
+  learner frame per reference frame; held/re-used frames and masked frames excluded). Per pair a 0–100 value via
+  100 / (1 + (error / half-credit)²); a component is the mean over the pairs it can measure. Half-credit errors: pose
+  0.30 torso lengths of mean joint distance (same per-pair translation + ±15 % scale fit as the alignment; + 0.01 per
+  degree of lean difference), joint angles 30° (½ mean + ½ two worst angles, so one wrong elbow shows), timing 0.5 s of
+  |original-timestamp lag| beyond 0.12 s. Sequence = 100 × matched share (measured reference moves credited with a
+  distinct, not-missing learner move) × direction factor (first 0.15 of disagreement free — a re-encode of the reference
+  itself measures 0.14) × warp factor (non-diagonal steps beyond 35 %, floor 0.7). Rhythm (experimental) = ½ motion-
+  envelope correlation (0.75 s smoothing, full credit at r ≥ 0.7) + ½ pace curve on |log pace|; unavailable when the
+  window < 4 s, < 30 compared moments or the reference envelope has no accents (CV < 0.25) — then the other weights are
+  re-normalised. Weights are the spec's product weights, labelled "not a validated grading scale" in the UI.
+- 2026-11-28 — Confidence = alignment confidence (measured share × warp) × min(1, visible-joint share / 0.75) × min(1,
+  compared / 24). Visible-joint share counts only joints the *reference* shows (the reference's cropping is not the
+  learner's fault). Suppressed (no numbers at all) when < 12 compared moments, confidence < 0.40, visible joints < 50 % or
+  a core component is missing; qualified ("low confidence" label) when confidence < 0.70, visible joints < 75 % or masked
+  > 25 %. Alignment not scorable (insufficient tracking/reference, out of band, immobile reference) → `not_scored`.
+- 2026-11-28 — Golden relationships live in `fixtures/fixture_manifest.json` → `scoring_relations` (21 claims on 2
+  references, real footage) and are evaluated by `tests/test_scoring_golden.py`. New committed attempts: `boy_good`,
+  `boy_late_0_4s` (second reference, different motion); the "different dance" for the boy reference is `girl_good`.
+  No real wrong-limb fixture exists (FFmpeg can't change one limb); wrong-arm/elbow relationships are covered by the
+  synthetic pure-maths tests only. Third reference dance still missing (no licence-verified full-body clip).
+- 2026-11-28 — Scores are computed on first `GET /api/practice-sessions/{id}/report` and stored in `performance_scores`
+  (one current row per attempt), reused while key = score version + alignment key + section boundaries matches; no
+  migration needed (key kept in the report JSON). Without numpy a stale/missing score → 503, never estimated.

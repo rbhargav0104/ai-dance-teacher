@@ -266,3 +266,34 @@ for a frame (the only remaining detection was "near enough"); appearance is now 
 Next: Outcome 7 — versioned scoring on top of `align-1` (confidence/coverage rules, golden-fixture relationship tests).
 - CI run 46066755574 (5a4576c) on `build` → **green** (backend incl. real-footage A2 tests, frontend, smoke incl. Teacher
   Mode, Practice and the new Choose-the-dancer browser checks, then LIMITED smoke). `main` fast-forwarded.
+
+## Session 9 — 2026-11-28 13:44–16:30 IST (Outcome 7: versioned scoring)
+
+Start: `add_repo` not offered; repo already cloned with push access. `origin/build` (75ec205, run log) had a green CI run
+(46068562914) → `main` fast-forwarded to it. Outcome 6 / A2 gates re-checked by the full backend suite (all passed).
+
+Delivered:
+- `backend/app/pose/scoring.py` (`score-1`): per-pair residuals rebuilt from the stored sequences exactly as `align-1`
+  compared them; pose / timing / sequence / joint angles / gated experimental rhythm; product weights re-normalised
+  over available components; coverage + confidence block; scored / qualified / suppressed / not_scored rules;
+  evidence per component, body parts, worst/best moments, per-section breakdown. See DECISIONS.md.
+- `backend/app/services/scoring.py` + `GET /api/practice-sessions/{id}/report`; stored in `performance_scores` with a
+  key (score version + alignment key + section boundaries); `score` summary on attempt responses. Alignment service
+  now exposes `load_sequences` / `require_ready`.
+- Fixtures: `boy_good`, `boy_late_0_4s` (scripts/make_attempt_fixtures.py; existing files regenerate byte-identical);
+  `scoring_relations` (21 claims) in `fixtures/fixture_manifest.json`.
+- Tests: `test_scoring_math.py` (19), `test_scoring_golden.py` (real footage, both references), `test_report_api.py`.
+- Frontend: `ScoreCard` on the attempt page (overall, components with weights + measured evidence, coverage, sections
+  with strongest/weakest, replayable moments, warnings, honest withheld/unavailable states), score in the attempts list,
+  `lib/score.ts` + tests; `practice.cjs` checks the card against the API.
+
+Commands and results:
+- `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest` → clean; 253 passed
+  (~9 min; golden test 118 s).
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` → clean; 101 passed.
+- Built web + API (READY): `scripts/smoke.sh` → SMOKE OK; `node scripts/e2e/practice.cjs` → PRACTICE CHECK OK (webcam
+  attempt once qualified 44, once suppressed — the looping fake camera starts mid-dance; flipped upload qualified 92.9);
+  `teacher-mode.cjs`, `choose-dancer.cjs` → OK; `learn-mode.cjs` → no errors/overflow.
+
+Next: Outcome 8 — clustered timestamp feedback (category / body part / time) from the score evidence, body-part delta
+overlay, replay links, positive observations, left/right correctness under mirroring.

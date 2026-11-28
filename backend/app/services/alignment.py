@@ -59,7 +59,7 @@ def cache_key(practice: PracticeSession, ref: ReferenceVideo, lo: float, hi: flo
     )
 
 
-def _require_ready(db: Session, practice: PracticeSession) -> tuple[DanceProject, ReferenceVideo]:
+def require_ready(db: Session, practice: PracticeSession) -> tuple[DanceProject, ReferenceVideo]:
     project = db.get(DanceProject, practice.project_id)
     ref = db.scalars(
         select(ReferenceVideo).where(ReferenceVideo.project_id == practice.project_id)
@@ -82,17 +82,45 @@ def _require_ready(db: Session, practice: PracticeSession) -> tuple[DanceProject
 
 def get_alignment(db: Session, practice: PracticeSession) -> tuple[dict[str, Any], bool]:
     """Returns (alignment, cached). Raises ApiError for honest refusals."""
-    project, ref = _require_ready(db, practice)
+    project, ref = require_ready(db, practice)
     lo, hi, seg_id = reference_window(db, practice, project, ref)
     key = cache_key(practice, ref, lo, hi)
     if practice.alignment is not None and practice.alignment_key == key:
         return practice.alignment, True
     try:
-        from app.pose.alignment import align, sequence_from_payloads
+        from app.pose.alignment import align
     except ImportError as exc:  # vision extra not installed
         raise ApiError(
             503, "analysis_unavailable", "Comparing movement isn't available on this server."
         ) from exc
+    ref_seq, att_seq = load_sequences(db, practice, ref, lo, hi)
+    preferred = "mirrored" if practice.declared_mirrored else "direct"
+    result = align(ref_seq, att_seq, preferred_mode=preferred)
+    result["window"] = {"start": round(lo, 3), "end": round(hi, 3), "segment_id": seg_id}
+    result["preferred_reason"] = (
+        "the video was marked as mirrored"
+        if practice.declared_mirrored
+        else "the learner uses the same body side as the dancer"
+    )
+    practice.alignment = result
+    practice.alignment_key = key
+    mirror = result.get("mirror")
+    if isinstance(mirror, dict):
+        practice.detected_mirror_choice = str(mirror.get("chosen"))[:16]
+    db.commit()
+    log.info(
+        "alignment_computed",
+        extra={"practice_id": practice.id, "status": result.get("status")},
+    )
+    return result, False
+
+
+def load_sequences(
+    db: Session, practice: PracticeSession, ref: ReferenceVideo, lo: float, hi: float
+) -> tuple[Any, Any]:
+    """Comparison sequences (app.pose.alignment.AlignSeq) of the reference window and the
+    attempt, built from the stored frames. Needs numpy (ImportError otherwise)."""
+    from app.pose.alignment import sequence_from_payloads
 
     ref_rows = db.scalars(
         select(ReferencePoseFrame)
@@ -119,22 +147,4 @@ def get_alignment(db: Session, practice: PracticeSession) -> tuple[dict[str, Any
         [r.payload for r in att_rows],
         [r.valid for r in att_rows],
     )
-    preferred = "mirrored" if practice.declared_mirrored else "direct"
-    result = align(ref_seq, att_seq, preferred_mode=preferred)
-    result["window"] = {"start": round(lo, 3), "end": round(hi, 3), "segment_id": seg_id}
-    result["preferred_reason"] = (
-        "the video was marked as mirrored"
-        if practice.declared_mirrored
-        else "the learner uses the same body side as the dancer"
-    )
-    practice.alignment = result
-    practice.alignment_key = key
-    mirror = result.get("mirror")
-    if isinstance(mirror, dict):
-        practice.detected_mirror_choice = str(mirror.get("chosen"))[:16]
-    db.commit()
-    log.info(
-        "alignment_computed",
-        extra={"practice_id": practice.id, "status": result.get("status")},
-    )
-    return result, False
+    return ref_seq, att_seq

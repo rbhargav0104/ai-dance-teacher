@@ -48,6 +48,7 @@ from app.services.practice import (
     resolve_segment,
     target_duration,
 )
+from app.services.scoring import current_summary, get_report
 from app.services.subjects import SubjectOut, subject_out
 from app.storage import get_storage
 
@@ -94,8 +95,9 @@ class PracticeOut(BaseModel):
     created_at: datetime
     latest_job: JobOut | None
     subject: SubjectOut | None = None  # who is in the attempt and whom we follow (A2)
-    # Comparison and scoring arrive in Outcomes 6-7; nothing here is a dance score.
+    # Latest still-valid stored score (Outcome 7); null until the report has been computed.
     scored: bool = False
+    score: dict[str, Any] | None = None
 
 
 class PracticeList(BaseModel):
@@ -146,6 +148,9 @@ def to_out(db: Session, practice: PracticeSession) -> PracticeOut:
         created_at=practice.created_at,
         latest_job=job_out(job) if job else None,
         subject=subject_out(practice.subject),
+        scored=(summary := current_summary(db, practice)) is not None
+        and summary.get("overall") is not None,
+        score=summary,
     )
 
 
@@ -369,6 +374,30 @@ def get_practice_alignment(
     result, cached = get_alignment(db, practice)
     response.headers["Cache-Control"] = "private, no-store"
     return AlignmentOut(practice_id=practice.id, cached=cached, alignment=result)
+
+
+class ReportOut(BaseModel):
+    practice_id: str
+    cached: bool
+    # Versioned score report (app.pose.scoring.score): components, weights, coverage and
+    # confidence, evidence. `overall` is null when the data don't support a fair score.
+    report: dict[str, Any]
+
+
+@router.get("/api/practice-sessions/{session_id}/report", response_model=ReportOut)
+def get_practice_report(
+    session_id: str,
+    user: CurrentUser,
+    db: Annotated[Session, Depends(get_db)],
+    response: Response,
+) -> ReportOut:
+    """Versioned score of the attempt against its reference window (Outcome 7). Computed from
+    stored frames on first request and stored until either analysis, the window or the
+    sections change. 409 when either side isn't analysed, 503 without numpy."""
+    practice = owned_practice(db, user.id, session_id)
+    report, cached = get_report(db, practice)
+    response.headers["Cache-Control"] = "private, no-store"
+    return ReportOut(practice_id=practice.id, cached=cached, report=report)
 
 
 @router.get("/api/practice-sessions/{session_id}/media/{kind}", response_model=MediaUrl)

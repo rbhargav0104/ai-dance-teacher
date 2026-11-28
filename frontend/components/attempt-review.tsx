@@ -32,6 +32,7 @@ import { followingSummary } from "@/lib/subject";
 import type { Alignment, PosesResponse, PracticeSession } from "@/lib/types";
 
 import { ProgressRing } from "./analysis-status";
+import { ScoreCard } from "./score-card";
 import { AttemptChip } from "./practice-studio";
 import { SkeletonOverlay } from "./skeleton-overlay";
 import { SubjectPicker } from "./subject-picker";
@@ -292,6 +293,7 @@ function RetryButton({ id, onDone, setNotice, label }: { id: string; onDone: () 
  */
 function SideBySide({ attempt }: { attempt: PracticeSession }) {
   const refVideo = useRef<HTMLVideoElement | null>(null);
+  const stage = useRef<HTMLDivElement | null>(null);
   const learnerVideo = useRef<HTMLVideoElement | null>(null);
   const [refSrc, setRefSrc] = useState<string | null>(null);
   const [learnerSrc, setLearnerSrc] = useState<string | null>(null);
@@ -413,7 +415,7 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
           {mediaError}
         </p>
       )}
-      <div className="grid gap-3 md:grid-cols-2">
+      <div ref={stage} className="grid scroll-mt-24 gap-3 md:grid-cols-2">
         <Pane label="Reference" sub={`${formatClock(target.start)}–${formatClock(target.end)}`} mirror={mirror}>
           {refSrc && (
             <>
@@ -526,9 +528,19 @@ function SideBySide({ attempt }: { attempt: PracticeSession }) {
       <p className="mt-2 text-xs text-muted" data-testid="review-sync-note">
         {paired && followPath
           ? "The reference follows your moves along the measured alignment, so a late start or a different pace still lines up. Switch to “Same time” to compare by the clock."
-          : `Both videos start at the beginning of ${target.segment_id ? "the section" : "the dance"} and play in step by the clock.`}{" "}
-        Nothing on this page is a score.
+          : `Both videos start at the beginning of ${target.segment_id ? "the section" : "the dance"} and play in step by the clock.`}
       </p>
+
+      <ScoreCard
+        attemptId={attempt.id}
+        onSeek={(lt) => {
+          pause();
+          seek(Math.max(0, lt - 1));
+          const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+          stage.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+          void play();
+        }}
+      />
 
       <AlignmentSummary attemptId={attempt.id} alignment={alignment} note={alignNote} />
 

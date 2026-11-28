@@ -100,6 +100,27 @@ VARIANTS: list[dict[str, object]] = [
 ]
 
 
+# Second reference (different motion: faster, bouncier arm work) so the golden scoring
+# relationships are checked on more than one dance (Outcome 7).
+VARIANTS += [
+    {
+        "id": "boy_good",
+        "reference": BOY,
+        "vf": BASE,
+        "relationship": "the boy performance re-encoded at 640x360: should score highest of the "
+        "boy_* attempts (upper bound for the second reference).",
+    },
+    {
+        "id": "boy_late_0_4s",
+        "reference": BOY,
+        "vf": f"{BASE},tpad=start_duration=0.4:start_mode=clone",
+        "relationship": "the boy performance starting 0.4 s late: pose similar to boy_good, "
+        "timing component clearly lower.",
+    },
+    # The "different dance" for the boy reference is girl_good itself (no extra file).
+]
+
+
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as fh:

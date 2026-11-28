@@ -1,5 +1,6 @@
 import type {
   AlignmentResponse,
+  ScoreReportResponse,
   ApiErrorBody,
   HealthResponse,
   JobInfo,
@@ -328,6 +329,7 @@ export const choosePracticeSubject = (id: string, person: number) =>
   });
 export const getPracticePoses = (id: string) => authed<PosesResponse>(`${practicePath(id)}/poses`);
 export const getPracticeAlignment = (id: string) => authed<AlignmentResponse>(`${practicePath(id)}/alignment`);
+export const getPracticeReport = (id: string) => authed<ScoreReportResponse>(`${practicePath(id)}/report`);
 export const getPracticeMedia = (id: string, kind: MediaKind = "canonical") =>
   authed<MediaUrl>(`${practicePath(id)}/media/${kind}`);
 
