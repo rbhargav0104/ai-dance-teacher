@@ -297,3 +297,6 @@ Commands and results:
 
 Next: Outcome 8 — clustered timestamp feedback (category / body part / time) from the score evidence, body-part delta
 overlay, replay links, positive observations, left/right correctness under mirroring.
+- CI run 46130717486 (234e7ed) on `build` → **green** (backend incl. real-footage golden scoring tests on the runner,
+  frontend, smoke incl. Teacher Mode, Practice with the score card, Choose-the-dancer, LIMITED smoke). `main`
+  fast-forwarded to 234e7ed. This run-log line is on `build` only; the next session ships it to `main` with its own green run.
